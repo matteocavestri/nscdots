@@ -1,0 +1,17 @@
+#!/bin/sh
+
+COMPOSITOR="$1"
+
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=wlroots
+export XDG_CURRENT_DESKTOP="$COMPOSITOR"  # Dynamically set the compositor
+
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM=wayland
+export SDL_VIDEODRIVER=wayland
+export _JAVA_AWT_WM_NONREPARENTING=1
+export QT_WAYLAND_DISABLE_WINDOWDECORATION="1"
+export ELM_DISPLAY=wl
+export GTK_USE_PORTAL=0
+
+dbus-run-session -- "$COMPOSITOR"

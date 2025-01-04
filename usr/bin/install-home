@@ -49,6 +49,7 @@ install_software() {
       log "INFO" "Installing Home software..."
       flatpak install --user -y flathub org.libreoffice.LibreOffice
       flatpak install --user -y flathub com.github.tchx84.Flatseal
+      flatpak install --user -y flathub com.saivert.pwvucontrol
       ;;
     audio-video)
       log "INFO" "Installing Audio Video software..."

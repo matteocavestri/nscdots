@@ -1,22 +1,11 @@
-# Wallpaper
-swww
+waybar >/dev/null 2>&1 &
+nm-applet > /dev/null 2>&1 &
+swaync > /dev/null 2>&1 &
+/usr/libexec/pipewire-launcher > /dev/null 2>&1 &
+/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1  > /dev/null 2>&1 &
+dbus-update-activation-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=labwc
+# swww
 
-# Bar
-waybar -c >/dev/null 2>&1 &
-
-# Notifications
-swaync
-
-# Network manager
-nm-applet
-
-# Lock screen after 5 minutes; turn off display after another 5 minutes.
-#
-# Note that in the context of idle system power management, it is *NOT* a good
-# idea to turn off displays by 'disabling outputs' for example by
-# `wlr-randr --output <whatever> --off` because this re-arranges views
-# (since a837fef). Instead use a wlr-output-power-management client such as
-# https://git.sr.ht/~leon_plickat/wlopm
 swayidle -w \
 	timeout 300 'swaylock -f -c 000000' \
 	timeout 600 'wlopm --off \*' \

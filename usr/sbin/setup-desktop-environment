@@ -66,7 +66,7 @@ Proceed with these settings? (yes/no):
 install_base_packages() {
   log "INFO" "Installing basic utilities..."
   apk add \
-    clang gcompat bash bash-completion python3 rust nodejs lua php deno \
+    clang gcompat bash bash-completion python3 rust go nodejs lua php deno \
     cmake make pipx cargo npm luarocks \
     doas neovim tmux htop git \
     lazygit ripgrep fd fzf curl wget starship ncurses less \
@@ -137,6 +137,7 @@ install_compositors() {
   log "INFO" "Installing and configuring Wayland..."
   apk add \
     wayland wayland-protocols xwayland wayland-pipewire-idle-inhibit \
+    wlr-protocols wlr-randr wlroots \
     libinput \
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
 
@@ -147,12 +148,12 @@ install_desktop_environments() {
   log "INFO" "Installing general desktop tools..."
   apk add \
     swww swaylock swaylockd swayidle waybar wlsunset fuzzel \
-    fuzzel foot pavucontrol network-manager-applet swaync \
+    fuzzel alacritty network-manager-applet swaync \
     polkit-gnome icu-data-full \
     grim slurp wl-clipboard libnotify \
     font-dejavu font-inconsolata-nerd font-noto-emoji font-terminus font-noto font-noto-cjk font-awesome font-noto-extra \
     font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc \
-    pcmanfm-qt swayimg mpv firefox \
+    thunar swayimg mpv \
     flatpak xdg-user-dirs
 
   # Add brightnss support
@@ -171,9 +172,6 @@ install_desktop_environments() {
 
   log "INFO" "Installing Sway..."
   apk add sway
-
-  log "INFO" "Installing Wayfire..."
-  apk add wayfire@testing wayfire-plugins-extra@testing
 }
 
 install_user_utilities() {
@@ -196,13 +194,11 @@ install_greetd() {
   apk add greetd greetd-regreet@testing cage
 
   if [ -f /etc/greetd/config.toml ]; then
-    sed -i 's|command = ".*"|command = "cage -s -mlast -- regreet"|' /etc/greetd/config.toml
+    sed -i 's|command = ".*"|command = "cage -s -mextend -- regreet"|' /etc/greetd/config.toml
   fi
 
-  echo "dbus-run-session -- labwc" >>/etc/greetd/environments
-  echo "dbus-run-session -- sway" >>/etc/greetd/environments
-  echo "dbus-run-session -- wayfire" >>/etc/greetd/environments
-  echo "tmux" >>/etc/greetd/environments
+  echo "start-compositor labwc
+    start-compositor sway" >>/etc/greetd/environments
 
   rc-update add greetd
 }
@@ -248,6 +244,16 @@ secure_system() {
   rc-update add ufw
 
   log "INFO" "Secure system configuration completed successfully"
+}
+
+install_flatpaks() {
+  log "INFO" "Installing Home software..."
+  su "$USERNAME" - c "
+      flatpak install --user -y flathub org.libreoffice.LibreOffice
+      flatpak install --user -y flathub com.github.tchx84.Flatseal
+      flatpak install --user -y flathub com.saivert.pwvucontrol
+      flatpak install --user -y flathub org.mozilla.firefox"
+
 }
 
 clean_variables() {

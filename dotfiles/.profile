@@ -33,7 +33,7 @@ export PATH="/var/lib/flatpak/exports/bin:$HOME/.local/share/flatpak/exports/bin
 
 # Default programs variables
 export EDITOR="nvim"
-export TERMINAL="foot"
+export TERMINAL="alacritty"
 # Use bash as default shell
 export SHELL="bash"
 
