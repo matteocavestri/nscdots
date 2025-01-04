@@ -107,13 +107,16 @@ install_binaries() {
 install_dotfiles() {
   printf "Installing dotfiles in %s...\n" "$user_home"
 
-  mkdir -p /home/matteocavestri/.config/labwc
-  mkdir -p /home/matteocavestri/.config/sway
-  mkdir -p /home/matteocavestri/.config/nvim/lua/config
-  mkdir -p /home/matteocavestri/.config/nvim/lua/plugins
-  mkdir -p /home/matteocavestri/.local/bin
+  mkdir -p /home/"$username"/.config/labwc
+  mkdir -p /home/"$username"/.config/sway
+  mkdir -p /home/"$username"/.config/nvim/lua/config
+  mkdir -p /home/"$username"/.config/nvim/lua/plugins
+  mkdir -p /home/"$username"/.local/bin
 
-  cp -r nscdots/dotfiles/.??* /home/"$username"/
+  cp nscdots/dotfiles/.profile /home/"$username"/.profile
+  cp nscdots/dotfiles/.bashrc /home/"$username"/.bashrc
+  cp -r nscdots/dotfiles/.config /home/"$username"/.config
+  cp -r nscdots/dotfiles/.local /home/"$username"/.local
 
   chmod +x /home/"$username"/.local/bin/*
 
