@@ -145,7 +145,7 @@ install_desktop_environments() {
     swww swaylock swaylockd swayidle waybar wlsunset fuzzel \
     fuzzel foot pavucontrol network-manager-applet swaync \
     polkit-gnome icu-data-full \
-    grim slurp wl-clipboard cliphist libnotify \
+    grim slurp wl-clipboard libnotify \
     font-dejavu font-inconsolata-nerd font-noto-emoji font-terminus font-noto font-noto-cjk font-awesome font-noto-extra \
     font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc \
     pcmanfm-qt swayimg mpv firefox \
