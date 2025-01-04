@@ -79,11 +79,15 @@ install_base_packages() {
   if [ -f /etc/doas.conf ] && grep -q '^# ' /etc/doas.conf; then
     sed -i '5s/^# //' /etc/doas.conf
   fi
+
+  log "INFO" "Enable testing repository..."
+  echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >>/etc/apk/repositories
+  apk update
 }
 
 install_and_configure_dbus() {
   log "INFO" "Installing and configuring dbus..."
-  apk add dbus dbus-x11
+  apk add dbus
   rc-update add dbus
   rc-service dbus start
 
@@ -132,7 +136,7 @@ install_network_manager() {
 install_compositors() {
   log "INFO" "Installing and configuring Wayland..."
   apk add \
-    wayland wayland-protocols xwayland xorg-server wayland-pipewire-idle-inhibit \
+    wayland wayland-protocols xwayland wayland-pipewire-idle-inhibit \
     libinput \
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
 
@@ -167,6 +171,9 @@ install_desktop_environments() {
 
   log "INFO" "Installing Sway..."
   apk add sway
+
+  log "INFO" "Installing Wayfire..."
+  apk add wayfire@testing wayfire-plugins-extra@testing
 }
 
 install_user_utilities() {
@@ -186,14 +193,15 @@ install_user_utilities() {
 
 install_greetd() {
   log "INFO" "Installing and configuring greetd..."
-  apk add greetd greetd-gtkgreet cage
+  apk add greetd greetd-regreet@testing cage
 
   if [ -f /etc/greetd/config.toml ]; then
-    sed -i 's|command = ".*"|command = "cage -s -- gtkgreet"|' /etc/greetd/config.toml
+    sed -i 's|command = ".*"|command = "cage -s -mlast -- regreet"|' /etc/greetd/config.toml
   fi
 
   echo "dbus-run-session -- labwc" >>/etc/greetd/environments
   echo "dbus-run-session -- sway" >>/etc/greetd/environments
+  echo "dbus-run-session -- wayfire" >>/etc/environments
   echo "tmux" >>/etc/greetd/environments
 
   rc-update add greetd

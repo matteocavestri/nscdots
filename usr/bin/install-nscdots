@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Global variables
-default_path="/tmp/nscdots"
+default_path="/root/nscdots"
 dots_path=""
 username=""
 user_home=""
@@ -107,20 +107,12 @@ install_binaries() {
 install_dotfiles() {
   printf "Installing dotfiles in %s...\n" "$user_home"
 
-  mkdir -p /home/"$username"/.config/labwc
-  mkdir -p /home/"$username"/.config/sway
-  mkdir -p /home/"$username"/.config/nvim/lua/config
-  mkdir -p /home/"$username"/.config/nvim/lua/plugins
+  mkdir -p /home/"$username"/.config
   mkdir -p /home/"$username"/.local/bin
 
-  cp "$dots_path"/dotfiles/.profile /home/"$username"/.profile
-  cp "$dots_path"/dotfiles/.bashrc /home/"$username"/.bashrc
-  cp -r "$dots_path"/dotfiles/.config /home/"$username"/.config
-  cp -r "$dots_path"/dotfiles/.local/bin/* /home/"$username"/.local/bin/
+  find "$dots_path"/dotfiles -type f -exec cp --parents {} /home/"$username"/ \;
+  find /home/"$username"/.local/bin -type f -exec chmod +x {} \;
 
-  chmod +x /home/"$username"/.local/bin/*
-
-  # Change ownership of all files and directories in the home directory
   chown -R "$username:$username" "$user_home"
   printf "Changed ownership of all files in '%s' to '%s:%s'.\n" "$user_home" "$username" "$username"
 }
