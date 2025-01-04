@@ -70,7 +70,7 @@ install_base_packages() {
     cmake make pipx cargo npm luarocks \
     doas neovim tmux htop git \
     lazygit ripgrep fd fzf curl wget starship ncurses less \
-    p7zip unzip xz tar
+    p7zip unzip xz tar rsync
 
   adduser "$USERNAME" wheel
   su "$USERNAME" -c "chsh -s /bin/bash"

@@ -110,8 +110,8 @@ install_dotfiles() {
   mkdir -p /home/"$username"/.config
   mkdir -p /home/"$username"/.local/bin
 
-  find "$dots_path"/dotfiles -type f -exec cp --parents {} /home/"$username"/ \;
-  find /home/"$username"/.local/bin -type f -exec chmod +x {} \;
+  rsync -av "$dots_path"/dotfiles /home/"$username"/
+  chmod +x /home/"$username"/.local/bin/*
 
   chown -R "$username:$username" "$user_home"
   printf "Changed ownership of all files in '%s' to '%s:%s'.\n" "$user_home" "$username" "$username"
