@@ -5,7 +5,6 @@ default_path="/root/nscdots"
 dots_path=""
 username=""
 user_home=""
-local_bin=""
 
 # Get the path to the nscdots, ensuring it exists
 get_dots_path() {
@@ -65,7 +64,6 @@ get_username() {
     # Check if the username exists on the system
     if id "$username" >/dev/null 2>&1; then
       user_home=$(eval echo "~$username")
-      local_bin="$user_home/.local/bin"
       return 0
     else
       printf "Error: User '%s' does not exist. Please try again.\n" "$username"

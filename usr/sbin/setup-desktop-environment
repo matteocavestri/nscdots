@@ -248,7 +248,7 @@ secure_system() {
 
 install_flatpaks() {
   log "INFO" "Installing Home software..."
-  su "$USERNAME" - c "
+  su "$USERNAME" -c "
       flatpak install --user -y flathub org.libreoffice.LibreOffice
       flatpak install --user -y flathub com.github.tchx84.Flatseal
       flatpak install --user -y flathub com.saivert.pwvucontrol
@@ -277,6 +277,7 @@ main() {
   install_user_utilities
   install_greetd
   secure_system
+  install_flatpaks
 
   clean_variables
   log "INFO" "Setup complete!"
