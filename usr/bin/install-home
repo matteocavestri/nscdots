@@ -1,0 +1,104 @@
+#!/bin/sh
+
+###########################################################
+# Script Name: group-software-installer
+# Description: This script switches to a specified user and installs
+#              software packages based on selected groups.
+# Usage:       Run the script and follow the prompts.
+# Author:      Matteo Cavestri
+# Version:     1.0
+# Date:        2025-01-03
+###########################################################
+
+log() {
+  level="$1"
+  message="$2"
+  printf '[%s] %s\n' "$level" "$message"
+}
+
+prompt_user() {
+  echo "Enter the username to execute the script: "
+  read -r TARGET_USER
+
+  CURRENT_USER=$(whoami)
+  if [ "$TARGET_USER" != "$CURRENT_USER" ]; then
+    log "INFO" "Switching to user: $TARGET_USER"
+    su - "$TARGET_USER" -c "$0"
+    exit 0
+  fi
+
+  log "INFO" "Running script as user: $TARGET_USER"
+}
+
+select_groups() {
+  echo "Available groups and their software packages:"
+  echo "home: Libreoffice, Brave Browser"
+  echo "audio-video: ardour, audacity, kdenlive, gimp, inkscape, obs, vlc"
+  echo "engineering: freecad, scilab, octave, kicad, JupyterLab Desktop, LabPlot"
+  echo "gaming: steam, lutris, prismlauncher, mangohud, gamescope, bottles, Proton-GE"
+  echo ""
+  echo "Enter the groups you want to install software for, separated by space:"
+  echo "Example: home audio-video engineering"
+  read -r SELECTED_GROUPS
+}
+
+install_software() {
+  for GROUP in $SELECTED_GROUPS; do
+    case $GROUP in
+    home)
+      log "INFO" "Installing Home software..."
+      flatpak install --user -y flathub org.libreoffice.LibreOffice
+      flatpak install --user -y flathub com.brave.Browser
+      flatpak install --user -y flathub com.github.tchx84.Flatseal
+      ;;
+    audio-video)
+      log "INFO" "Installing Audio Video software..."
+      flatpak install --user -y flathub org.ardour.Ardour
+      flatpak install --user -y flathub org.audacityteam.Audacity
+      flatpak install --user -y flathub org.kde.kdenlive
+      flatpak install --user -y flathub org.gimp.GIMP
+      flatpak install --user -y flathub org.inkscape.Inkscape
+      flatpak install --user -y flathub com.obsproject.Studio
+      flatpak install --user -y flathub org.videolan.VLC
+      ;;
+    engineering)
+      log "INFO" "Installing Engineering software..."
+      flatpak install --user -y flathub org.freecad.FreeCAD
+      flatpak install --user -y flathub org.scilab.Scilab
+      flatpak install --user -y flathub org.octave.Octave
+      flatpak install --user -y flathub org.kicad.KiCad
+      flatpak install --user -y flathub org.jupyter.JupyterLab
+      flatpak install --user -y flathub org.kde.labplot2
+      ;;
+    gaming)
+      log "INFO" "Installing Gaming software..."
+      doas apk add steam-devices
+      flatpak install --user -y flathub com.valvesoftware.Steam
+      flatpak install --user -y flathub net.lutris.Lutris
+      flatpak install --user -y flathub org.prismlauncher.PrismLauncher
+      flatpak install --user -y flathub com.usebottles.bottles
+      flatpak install --user -y flathub org.freedesktop.Platform.VulkanLayer.MangoHud
+      flatpak install --user -y flathub org.freedesktop.Platform.VulkanLayer.gamescope
+      flatpak install --user -y flathub com.valvesoftware.Steam.CompatibilityTool.Proton-GE
+      ;;
+    *)
+      log "ERROR" "Unknown group: $GROUP"
+      ;;
+    esac
+  done
+}
+
+clean_variables() {
+  unset TARGET_USER
+  unset CURRENT_USER
+  unset SELECTED_GROUPS
+}
+
+main() {
+  prompt_user
+  select_groups
+  install_software
+  clean_variables
+}
+
+main "$@"

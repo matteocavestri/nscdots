@@ -1,0 +1,271 @@
+#!/bin/sh
+
+###########################################################
+# Script Name: setup-desktop-environment
+# Description: This script installs and configures basic packages,
+#              desktop environments, compositor tools, and services.
+# Usage:       Run the script and follow the prompts.
+# Author:      Matteo Cavestri
+# Version:     1.0
+# Date:        2025-01-03
+###########################################################
+
+usage() {
+  cat <<EOF
+Usage: setup-desktop-environment
+
+Follow the prompts to install and configure your desktop environment.
+EOF
+}
+
+log() {
+  level="$1"
+  message="$2"
+  printf '[%s] %s\n' "$level" "$message"
+}
+
+prompt_user() {
+  echo "Enter the username to configure permissions for: "
+  read -r USERNAME
+  if [ -z "$USERNAME" ]; then
+    log "ERROR" "Username cannot be empty. Exiting."
+    exit 1
+  fi
+
+  echo "Do you need WiFi support? (yes/no): "
+  read -r WIFI_SUPPORT
+
+  echo "Do you need Bluetooth support? (yes/no): "
+  read -r BT_SUPPORT
+
+  echo "Do you need printer support? (yes/no): "
+  read -r PRINTER_SUPPORT
+
+  echo "Do you need brightness support? (yes/no): "
+  read -r BRIGHTNESS_SUPPORT
+
+  printf '
+You have selected the following options:
+'
+  echo "Username: $USERNAME"
+  echo "WiFi support: $WIFI_SUPPORT"
+  echo "Bluetooth support: $BT_SUPPORT"
+  echo "Printer support: $PRINTER_SUPPORT"
+  echo "Brightness support: $BRIGHTNESS_SUPPORT"
+
+  printf '
+Proceed with these settings? (yes/no):
+'
+  read -r CONFIRMATION
+  if [ "$CONFIRMATION" != "yes" ]; then
+    log "INFO" "Setup aborted by user."
+    exit 0
+  fi
+}
+
+install_base_packages() {
+  log "INFO" "Installing basic utilities..."
+  apk add \
+    clang gcompat bash bash-completion python3 rust nodejs lua php deno \
+    cmake make pipx cargo npm luarocks \
+    doas neovim tmux htop git \
+    lazygit ripgrep fd fzf curl wget starship ncurses less \
+    p7zip unzip xz tar
+
+  adduser "$USERNAME" wheel
+  su "$USERNAME" -c "chsh -s /bin/bash"
+
+  log "INFO" "Configuring doas..."
+  if [ -f /etc/doas.conf ] && grep -q '^# ' /etc/doas.conf; then
+    sed -i '5s/^# //' /etc/doas.conf
+  fi
+}
+
+install_and_configure_dbus() {
+  log "INFO" "Installing and configuring dbus..."
+  apk add dbus dbus-x11
+  rc-update add dbus
+  rc-service dbus start
+
+  log "INFO" "Installing and configuring elogind..."
+  setup-devd udev
+  apk add elogind polkit-elogind
+  rc-update add elogind
+  rc-update add polkit
+  rc-service elogind start
+  rc-service polkit start
+}
+
+install_pipewire() {
+  log "INFO" "Installing and configuring Pipewire..."
+  apk add \
+    pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber rtkit \
+    ffmpeg gstreamer gst-plugins-base gst-plugins-pipewire gst-vaapi
+
+  adduser "$USERNAME" audio
+  adduser "$USERNAME" video
+  adduser "$USERNAME" rtkit
+}
+
+install_network_manager() {
+  log "INFO" "Installing and configuring NetworkManager..."
+  apk add \
+    networkmanager networkmanager-dnsmasq networkmanager-cli
+
+  if [ "$WIFI_SUPPORT" = "yes" ]; then
+    apk add networkmanager-wifi
+  fi
+
+  rc-update add networkmanager default
+  rc-service networkmanager start
+  adduser "$USERNAME" plugdev
+
+  if [ "$BT_SUPPORT" = "yes" ]; then
+    apk add bluez networkmanager-bluetooth
+    modprobe btusb
+    adduser "$USERNAME" lp
+    rc-service bluetooth start
+    rc-update add bluetooth default
+  fi
+}
+
+install_compositors() {
+  log "INFO" "Installing and configuring Wayland..."
+  apk add \
+    wayland wayland-protocols xwayland xorg-server wayland-pipewire-idle-inhibit \
+    libinput evdev \
+    xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
+
+  adduser "$USERNAME" input
+}
+
+install_desktop_environments() {
+  log "INFO" "Installing general desktop tools..."
+  apk add \
+    swww swaylock swaylockd swayidle waybar wlsunset fuzzel \
+    fuzzel foot pavucontrol network-manager-applet swaync \
+    polkit-gnome icu-data-full \
+    grim slurp wl-clipboard cliphist libnotify \
+    font-dejavu font-inconsolata-nerd font-noto-emoji font-terminus font-noto font-noto-cjk font-awesome font-noto-extra \
+    font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc \
+    pcmanfm-qt swayimg mpv firefox \
+    flatpak xdg-user-dirs
+
+  # Add brightnss support
+  if [ "$BRIGHTNESS_SUPPORT" = "yes" ]; then
+    apk add brightnessctl brightnessctl-udev
+  fi
+
+  # Update font cache
+  fc-cache -fv
+
+  su "$USERNAME" -c "flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
+  su "$USERNAME" -c "xdg-user-dirs-update"
+
+  log "INFO" "Installing Labwc..."
+  apk add labwc
+
+  log "INFO" "Installing Sway..."
+  apk add sway
+}
+
+install_user_utilities() {
+  log "INFO" "Installing user utilities for the desktop..."
+  apk add \
+    gvfs udisks2 \
+    ntfs-3g \
+    gvfs-goa gvfs-smb gvfs-afc gvfs-nfs gvfs-dav gvfs-fuse gvfs-avahi
+
+  if [ "$PRINTER_SUPPORT" = "yes" ]; then
+    log "INFO" "Installing and configuring printer support..."
+    apk add cups cups-filters
+    rc-service cupsd start
+    rc-update add cupsd boot
+  fi
+}
+
+install_greetd() {
+  log "INFO" "Installing and configuring greetd..."
+  apk add greetd greetd-gtkgreet cage
+
+  if [ -f /etc/greetd/config.toml ]; then
+    sed -i 's|command = ".*"|command = "cage -s -- gtkgreet"|' /etc/greetd/config.toml
+  fi
+
+  echo "dbus-run-session -- labwc" >>/etc/greetd/environments
+  echo "dbus-run-session -- sway" >>/etc/greetd/environments
+
+  rc-update add greetd
+  rc-service greetd start
+}
+
+secure_system() {
+  log "INFO" "Installing AppArmor..."
+  apk add apparmor
+
+  log "INFO" "Configuring GRUB for AppArmor..."
+  # Append AppArmor configuration to GRUB_CMDLINE_LINUX_DEFAULT
+  if grep -q "GRUB_CMDLINE_LINUX_DEFAULT" /etc/default/grub; then
+    sed -i 's/\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)/\1 apparmor=1 security=apparmor/' /etc/default/grub
+  else
+    echo 'GRUB_CMDLINE_LINUX_DEFAULT="apparmor=1 security=apparmor"' >>/etc/default/grub
+  fi
+  grub-mkconfig -o /boot/grub/grub.cfg
+
+  log "INFO" "Starting and enabling AppArmor..."
+  rc-service apparmor start
+  rc-update add apparmor boot
+  apk add apparmor-profiles
+
+  log "INFO" "Installing audit framework..."
+  apk add audit
+  rc-service auditd start
+  rc-update add auditd
+
+  log "INFO" "Installing UFW (Uncomplicated Firewall)..."
+  apk add iptables ip6tables ufw
+
+  # Set default firewall rules
+  log "INFO" "Setting default firewall rules..."
+  ufw default deny incoming
+  ufw default allow outgoing
+  # Configure specific rules
+  ufw limit SSH         # Protect SSH against brute-force attacks
+  ufw allow out 123/udp # Allow outgoing NTP (Network Time Protocol)
+  ufw allow out DNS     # Allow outgoing DNS traffic
+  ufw allow out 80/tcp  # Allow outgoing HTTP traffic
+  ufw allow out 443/tcp # Allow outgoing HTTPS traffic
+  ufw allow out 53/tcp  # Allow outgoing DNS over TCP
+  ufw enable
+  rc-update add ufw
+
+  log "INFO" "Secure system configuration completed successfully"
+}
+
+clean_variables() {
+  unset USERNAME
+  unset WIFI_SUPPORT
+  unset BT_SUPPORT
+  unset PRINTER_SUPPORT
+  unset CONFIRMATION
+  unset BRIGHTNESS_SUPPORT
+}
+
+main() {
+  prompt_user
+
+  install_base_packages
+  install_and_configure_dbus
+  install_pipewire
+  install_network_manager
+  install_compositors
+  install_desktop_environments
+  install_user_utilities
+  install_greetd
+  secure_system
+
+  clean_variables
+  log "INFO" "Setup complete!"
+}
+
+main "$@"

@@ -1,0 +1,59 @@
+#!/bin/sh
+
+COMPOSITOR="$1"
+
+# Define the log file
+mkdir -p "$HOME/.cache"
+LOGFILE="$HOME/.cache/wsession-errors"
+exec >"$LOGFILE" 2>&1
+
+# Log the script start time
+echo "$COMPOSITOR session started: $(date)"
+
+# XDG Desktop portal config
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=wlroots
+export XDG_CURRENT_DESKTOP="$COMPOSITOR" # Dynamically set the compositor
+export GTK_USE_PORTAL=0
+
+# Wayland Display
+export WAYLAND_DISPLAY=wayland-0
+
+# Programs support
+export QT_QPA_PLATFORM=wayland
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+export ELM_DISPLAY=wl
+export GDK_BACKEND=wayland
+export CLUTTER_BACKEND=wayland
+export SDL_VIDEODRIVER=wayland
+export ELECTRON_ENABLE_WAYLAND=1
+
+# Hardware performance
+export NO_AT_BRIDGE=1
+
+# Java support
+export _JAVA_AWT_WM_NONREPARENTING=1
+
+# Browser wayland support
+export MOZ_ENABLE_WAYLAND=1
+export CHROMIUM_ENABLE_WAYLAND=1
+export OZONE_PLATFORM=wayland
+
+# Wayland debug
+export WAYLAND_DEBUG=0
+
+# Xwayland support
+export DISPLAY=:0
+export XWAYLAND_NO_GLAMOR=0
+export XWAYLAND_EXTENSION_PATH=/usr/lib/xorg/modules/extensions
+export XWAYLAND_ACCELERATED=1
+export XMODULEPATH=/usr/lib/xorg/modules
+
+# Run pipewire and polkit
+/usr/libexec/pipewire-launcher >>/dev/null 2>&1 &
+/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 >>/dev/null 2>&1 &
+
+dbus-update-activation-environment --verbose WAYLAND_DISPLAY XDG_CURRENT_DESKTOP="$COMPOSITOR"
+
+# Start the compositor dynamically based on the argument
+dbus-run-session -- "$COMPOSITOR"

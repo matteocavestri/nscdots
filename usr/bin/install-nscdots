@@ -1,0 +1,156 @@
+#!/bin/sh
+
+# Global variables
+default_path="/tmp/nscdots"
+dots_path=""
+username=""
+user_home=""
+local_bin=""
+
+# Get the path to the nscdots, ensuring it exists
+get_dots_path() {
+  while true; do
+    printf "Enter the path where nscdots are downloaded (default: %s): " "$default_path"
+    read -r dots_path
+
+    # Use the default path if no input is provided
+    [ -z "$dots_path" ] && dots_path="$default_path"
+
+    # Check if the path exists and is a directory
+    if [ -d "$dots_path" ]; then
+      return 0
+    else
+      printf "Error: '%s' is not a valid directory. Please try again.\n" "$dots_path"
+    fi
+  done
+}
+
+# Display the actions that the script will perform
+show_actions() {
+  cat <<EOF
+
+This script will perform the following actions:
+1. Add binaries to /usr/sbin and /usr/bin.
+2. Make changes to /etc.
+3. Install dotfiles for a specific user.
+4. Install binaries in ~/.local/bin for the user.
+5. Perform user-specific configuration.
+
+EOF
+}
+
+# Confirm if the user wants to proceed
+confirm_actions() {
+  while true; do
+    printf "Do you want to proceed with the installation? (yes/no): "
+    read -r proceed
+
+    case "$proceed" in
+    yes) return 0 ;; # User confirmed
+    no)
+      printf "Installation aborted.\n"
+      exit 0
+      ;; # User declined
+    *) printf "Invalid input. Please enter 'yes' or 'no'.\n" ;;
+    esac
+  done
+}
+
+# Prompt for the username and validate it exists
+get_username() {
+  while true; do
+    printf "Enter the username to configure: "
+    read -r username
+
+    # Check if the username exists on the system
+    if id "$username" >/dev/null 2>&1; then
+      user_home=$(eval echo "~$username")
+      local_bin="$user_home/.local/bin"
+      return 0
+    else
+      printf "Error: User '%s' does not exist. Please try again.\n" "$username"
+    fi
+  done
+}
+
+# Install binaries to /usr/sbin and /usr/bin
+install_binaries() {
+  printf "Adding binaries to /usr/sbin and /usr/bin...\n"
+
+  # Copy files from $dots_path/sbin to /usr/sbin
+  if [ -d "$dots_path/usr/sbin" ]; then
+    for file in "$dots_path/usr/sbin/"*; do
+      if [ -f "$file" ]; then
+        cp "$file" /usr/sbin/
+        chmod +x "/usr/sbin/$(basename "$file")"
+      fi
+    done
+    printf "Copied and set executable permissions for binaries in /usr/sbin.\n"
+  else
+    printf "Warning: No binaries found in '%s/sbin'.\n" "$dots_path"
+  fi
+
+  # Copy files from $dots_path/bin to /usr/bin
+  if [ -d "$dots_path/usr/bin" ]; then
+    for file in "$dots_path/usr/bin/"*; do
+      if [ -f "$file" ]; then
+        cp "$file" /usr/bin/
+        chmod +x "/usr/bin/$(basename "$file")"
+      fi
+    done
+    printf "Copied and set executable permissions for binaries in /usr/bin.\n"
+  else
+    printf "Warning: No binaries found in '%s/bin'.\n" "$dots_path"
+  fi
+}
+
+install_dotfiles() {
+  printf "Installing dotfiles in %s...\n" "$user_home"
+
+  # Ensure the base structure exists
+  mkdir -p "$user_home"
+
+  # Copy all content from dotfiles to the user's home directory
+  cp -r "$dots_path/dotfiles/"* "$user_home/"
+
+  # Ensure files in .local/bin are executable
+  local_bin="$user_home/.local/bin"
+  if [ -d "$local_bin" ]; then
+    find "$local_bin" -type f -exec chmod +x {} \;
+    printf "Set executable permissions for files in '%s'.\n" "$local_bin"
+  else
+    printf "Warning: Directory '.local/bin' not found or is empty.\n"
+  fi
+
+  # Change ownership of all files and directories in the home directory
+  chown -R "$username:$username" "$user_home"
+  printf "Changed ownership of all files in '%s' to '%s:%s'.\n" "$user_home" "$username" "$username"
+}
+
+# Clean up global variables
+unset_variables() {
+  unset default_path dots_path username user_home local_bin
+}
+
+# Main script execution
+main() {
+  # User interaction
+  get_dots_path
+  show_actions
+  get_username
+  confirm_actions
+
+  # Perform installation steps
+  printf "Installing nscdots from: %s\n" "$dots_path"
+  install_binaries
+  install_dotfiles
+
+  # Final confirmation
+  printf "Installation complete for user: %s\n" "$username"
+
+  # Clean up
+  unset_variables
+}
+
+# Execute the main function
+main

@@ -1,0 +1,206 @@
+#!/bin/sh
+
+###########################################################
+# Script Name: setup-hardware
+# Description: This script installs CPU microcode and GPU drivers,
+#              configures multi-GPU setups, and updates environment variables.
+# Usage:       Run the script and follow the prompts.
+# Author:      Matteo Cavestri
+# Version:     1.0
+# Date:        2025-01-02
+###########################################################
+
+usage() {
+  cat <<EOF
+Usage: setup-hardware
+
+Follow the prompts to install CPU microcode and GPU drivers, and configure your hardware.
+EOF
+}
+
+log() {
+  level="$1"
+  message="$2"
+  printf '[%s] %s\n' "$level" "$message"
+}
+
+prompt_user() {
+  echo "Enter the username for configuration: "
+  read -r USERNAME
+
+  echo "Select microcode (intel, amd): "
+  read -r MICROCODE_CHOICE
+
+  echo "Enter GPU vendors (intel, amd, nvidia; separate by space for multiple): "
+  read -r GPU_CHOICE
+
+  for VENDOR in $GPU_CHOICE; do
+    case $VENDOR in
+    intel)
+      echo "Is your Intel GPU pre-Broadwell or post-Broadwell? (pre/post): "
+      read -r INTEL_CHOICE
+      ;;
+    amd)
+      echo "Is your AMD GPU pre-Vega or post-Vega? (pre/post): "
+      read -r AMD_CHOICE
+      ;;
+    esac
+  done
+
+  echo "Select your preferred primary GPU from the following (choose dedicated if available):"
+  for VENDOR in $GPU_CHOICE; do
+    echo "- $VENDOR"
+  done
+
+  echo "Enter your choice: "
+  read -r PRIMARY_GPU
+
+  echo "You have chosen the following configuration:"
+  echo "User: $USERNAME"
+  echo "CPU Microcode: $MICROCODE_CHOICE"
+  echo "GPU Vendors: $GPU_CHOICE"
+  [ -n "$INTEL_CHOICE" ] && echo "Intel GPU: $INTEL_CHOICE"
+  [ -n "$AMD_CHOICE" ] && echo "AMD GPU: $AMD_CHOICE"
+  echo "Primary GPU: $PRIMARY_GPU"
+
+  echo "Do you want to proceed with this configuration? (yes/no): "
+  read -r CONFIRMATION
+  if [ "$CONFIRMATION" != "yes" ]; then
+    log "INFO" "Setup aborted by user."
+    exit 0
+  fi
+}
+
+install_cpu_microcode() {
+  log "INFO" "Installing CPU microcode..."
+  case $MICROCODE_CHOICE in
+  intel)
+    apk add intel-ucode
+    ;;
+  amd)
+    apk add amd-ucode
+    ;;
+  *)
+    log "ERROR" "Unknown microcode choice: $MICROCODE_CHOICE"
+    return
+    ;;
+  esac
+  log "INFO" "CPU microcode installed."
+}
+
+install_gpu_drivers() {
+  log "INFO" "Installing GPU drivers..."
+  for VENDOR in $GPU_CHOICE; do
+    case $VENDOR in
+    intel)
+      if [ "$INTEL_CHOICE" = "post" ]; then
+        apk add intel-media-driver
+      elif [ "$INTEL_CHOICE" = "pre" ]; then
+        apk add libva-intel-driver
+      else
+        log "ERROR" "Invalid choice for Intel GPU."
+        return
+      fi
+
+      apk add \
+        linux-firmware-i915 \
+        mesa-dri-gallium \
+        mesa-va-gallium mesa-vdpau-gallium libva-glx \
+        mesa-egl mesa-gbm mesa-gl mesa-gles \
+        mesa-rusticl opencl-headers opencl-icd-loader \
+        mesa-vulkan-intel
+      ;;
+    amd)
+      if [ "$AMD_CHOICE" = "post" ]; then
+        apk add linux-firmware-amdgpu
+      else
+        apk add linux-firmware-radeon
+      fi
+
+      apk add \
+        mesa-dri-gallium \
+        mesa-va-gallium mesa-vdpau-gallium \
+        mesa-egl mesa-gbm mesa-gl mesa-gles \
+        mesa-rusticl opencl-headers opencl-icd-loader \
+        mesa-vulkan-ati
+
+      if [ "$AMD_CHOICE" = "pre" ]; then
+        echo radeon >>/etc/modules
+      else
+        echo amdgpu >>/etc/modules
+      fi
+
+      apk add mkinitfs
+      if [ -f /etc/mkinitfs/mkinitfs.conf ]; then
+        sed -i 's/features: "/features: "kms /' /etc/mkinitfs/mkinitfs.conf
+      fi
+      mkinitfs
+      ;;
+    nvidia)
+      apk add \
+        mesa-dri-gallium \
+        mesa-va-gallium mesa-vdpau-gallium \
+        mesa-egl mesa-gbm mesa-gl mesa-gles \
+        mesa-rusticl opencl-headers opencl-icd-loader
+      ;;
+    *)
+      log "ERROR" "Unknown vendor: $VENDOR"
+      ;;
+    esac
+  done
+
+  configure_primary_gpu
+}
+
+configure_primary_gpu() {
+  log "INFO" "Configuring primary GPU..."
+  case $PRIMARY_GPU in
+  nvidia)
+    echo "MESA_LOADER_DRIVER_OVERRIDE=nouveau" >>/etc/environment
+    echo "LIBVA_DRIVER_NAME=nouveau" >>/etc/environment
+    echo "VDPAU_DRIVER=nouveau" >>/etc/environment
+    echo "RUSTICL_ENABLE=nouveau" >>/etc/environment
+    log "INFO" "Primary GPU set to: NVIDIA"
+    ;;
+  amd)
+    # echo "MESA_LOADER_DRIVER_OVERRIDE=radeonsi" >>/etc/environment
+    echo "LIBVA_DRIVER_NAME=radeonsi" >>/etc/environment
+    echo "VDPAU_DRIVER=radeonsi" >>/etc/environment
+    echo "RUSTICL_ENABLE=radeonsi" >>/etc/environment
+    log "INFO" "Primary GPU set to: AMD"
+    ;;
+  intel)
+    # echo "MESA_LOADER_DRIVER_OVERRIDE=i965" >>/etc/environment
+    if [ "$INTEL_CHOICE" = "post" ]; then
+      echo "LIBVA_DRIVER_NAME=iHD" >>/etc/environment
+    else
+      echo "LIBVA_DRIVER_NAME=i965" >>/etc/environment
+    fi
+    echo "VDPAU_DRIVER=va_gl" >>/etc/environment
+    echo "RUSTICL_ENABLE=iris" >>/etc/environment
+    log "INFO" "Primary GPU set to: Intel"
+    ;;
+  *)
+    log "ERROR" "Invalid choice for primary GPU: $PRIMARY_GPU"
+    return
+    ;;
+  esac
+}
+
+clean_variables() {
+  unset USERNAME
+  unset MICROCODE_CHOICE
+  unset GPU_CHOICE
+  unset INTEL_CHOICE
+  unset AMD_CHOICE
+  unset PRIMARY_GPU
+}
+
+main() {
+  prompt_user
+  install_cpu_microcode
+  install_gpu_drivers
+  clean_variables
+}
+
+main "$@"

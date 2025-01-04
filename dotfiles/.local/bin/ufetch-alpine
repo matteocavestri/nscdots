@@ -1,0 +1,113 @@
+#!/bin/sh
+
+###########################################################
+# Script Name: ufetch-alpine
+# Description: This script displays minimal system information
+#              for Alpine Linux, including OS, kernel, uptime,
+#              package counts, shell, and user interface.
+# Usage:       Run the script directly to view the information.
+# Author:      Matteo Cavestri
+# Version:     1.1
+# Date:        2025-01-03
+###########################################################
+
+## System Information
+
+# Load distribution information from /etc/os-release
+if [ -f /etc/os-release ]; then
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  os="${PRETTY_NAME:-${NAME}}"
+else
+  os="Unknown Linux"
+fi
+
+# Gather basic system information
+host="$(hostname)"
+kernel="$(uname -sr)"
+uptime="$(cut -d ',' -f 1 /proc/uptime | awk '{print int($1/3600)"h "int(($1%3600)/60)"m"}')"
+packages="$(apk info | wc -l)"
+
+# Check for Flatpak and count installed packages
+flatpak_system="0"
+flatpak_user="0"
+if [ -x "$(command -v flatpak)" ]; then
+  flatpak_system="$(flatpak list --system --columns=ref 2>/dev/null | wc -l)"
+  flatpak_user="$(flatpak list --user --columns=ref 2>/dev/null | wc -l)"
+fi
+
+# Prepare Flatpak output
+flatpak_info=""
+if [ "$flatpak_system" -gt 0 ] && [ "$flatpak_user" -gt 0 ]; then
+  flatpak_info="$flatpak_system (flatpak-system), $flatpak_user (flatpak-user)"
+elif [ "$flatpak_system" -gt 0 ]; then
+  flatpak_info="$flatpak_system (flatpak-system)"
+elif [ "$flatpak_user" -gt 0 ]; then
+  flatpak_info="$flatpak_user (flatpak-user)"
+fi
+
+shell="$(basename "${SHELL}")"
+
+## Desktop Environment / Window Manager Detection
+
+# Function to parse session-related files
+parse_rcs() {
+  for f in "${@}"; do
+    wm="$(tail -n 1 "${f}" 2>/dev/null | cut -d ' ' -f 2)"
+    [ -n "${wm}" ] && echo "${wm}" && return
+  done
+}
+
+# Determine the user interface in use
+rcwm="$(parse_rcs "${HOME}/.xinitrc" "${HOME}/.xsession")"
+
+ui='unknown'
+if [ -n "${DE}" ]; then
+  ui="${DE}"
+elif [ -n "${WM}" ]; then
+  ui="${WM}"
+elif [ -n "${XDG_CURRENT_DESKTOP}" ]; then
+  ui="${XDG_CURRENT_DESKTOP}"
+elif [ -n "${DESKTOP_SESSION}" ]; then
+  ui="${DESKTOP_SESSION}"
+elif [ -n "${rcwm}" ]; then
+  ui="${rcwm}"
+elif [ -n "${XDG_SESSION_TYPE}" ]; then
+  ui="${XDG_SESSION_TYPE}"
+fi
+
+ui="$(basename "${ui}")"
+
+# Clean up temporary variables
+unset DE WM XDG_CURRENT_DESKTOP DESKTOP_SESSION XDG_SESSION_TYPE rcwm parse_rcs
+
+## Color Definitions
+
+# Use tput to set colors if available
+if [ -x "$(command -v tput)" ]; then
+  magenta="$(tput setaf 5 2>/dev/null)"
+  cyan="$(tput setaf 6 2>/dev/null)"
+  reset="$(tput sgr0 2>/dev/null)"
+fi
+
+ic="${reset}"
+c0="${reset}${cyan}"
+c1="${reset}${magenta}"
+
+## Output System Information
+
+cat <<EOF
+
+${c1}      ___     ${c1}${USER}${c0}@${c1}${host}${reset}
+${c1}     (${c0}.. ${c1}\    ${ic}* ${c0}${os}${reset}
+${c1}     (${c0}<> ${c1}|    ${ic}+ ${c0}${kernel}${reset}
+${c1}    //  \\ \\   ${ic}> ${c0}${uptime}${reset}
+${c1}   ( |  | /|  ${ic}# ${c1}${packages} (apk)${reset} ${flatpak_info:+, ${flatpak_info}}
+${c1}  _${c1}/\\ __)/_)  ${ic}$ ${c0}${shell}${reset}
+${c0}  \/${c1}-____${c0}\/   ${ic}@ ${c0}${ui}${reset}
+
+EOF
+
+## Clean up variables
+unset host os kernel uptime packages flatpak_system flatpak_user flatpak_info shell ui \
+  magenta cyan reset ic c0 c1

@@ -1,0 +1,624 @@
+#!/bin/sh
+#==============================================================================
+# openrc-tui (version 1.0)
+#------------------------------------------------------------------------------
+# Author: Matteo Cavestri
+#
+# Description:
+#   This script displays OpenRC services in a TUI (Text User Interface).
+#   The script uses arrow key navigation (or vim-style k/j) to move between
+#   services, and offers sub-menus to view logs or init scripts and to edit them.
+#   It is designed to be POSIX-compliant where possible.
+#
+# Dependencies (external executables):
+#   - rc-status: to fetch OpenRC service statuses.
+#   - grep: to search for patterns within text.
+#   - pgrep: to find process IDs by name.
+#   - ps: to fetch process details (e.g., user, command).
+#   - sed: to manipulate strings (e.g., extract statuses).
+#   - wc: to count lines and other statistics.
+#   - tput: to query terminal dimensions.
+#   - mktemp: to create temporary files.
+#   - awk: for text parsing and formatting.
+#   - dd: to read single keystrokes in raw mode.
+#
+#==============================================================================
+
+###############################################################################
+# GLOBALS & UTILITIES
+# -----------------------------------------------------------------------------
+# These variables and functions handle core tasks, such as storing data about
+# the current position in the service list, generating the service file, and
+# cleaning up after the script exits. They also manage terminal formatting like
+# clearing the screen and moving the cursor.
+###############################################################################
+
+# ShellCheck config
+# shellcheck disable=SC3003
+
+# Global variables to track the current highlighted service row and scrolling.
+current_row=0
+scroll_position=0
+services_file="/tmp/services_status.txt"
+
+#-------------------------------------------------------------------------------
+# cleanup()
+#   Removes temporary files, restores cursor visibility, clears the screen, and
+#   then exits the script. Invoked upon normal exit or when signals (INT, TERM)
+#   are received.
+#-------------------------------------------------------------------------------
+cleanup() {
+  rm -f "$services_file"
+  # Show the cursor again (it was hidden in the TUI).
+  printf '\033[?25h'
+  clear_screen
+  exit
+}
+
+# Handle script exit on INT, TERM, or normal script termination.
+trap 'cleanup' INT TERM EXIT
+
+#-------------------------------------------------------------------------------
+# clear_screen()
+#   Simple helper function to clear the terminal screen and move the cursor to
+#   the top-left corner.
+#-------------------------------------------------------------------------------
+clear_screen() {
+  printf '\033[2J\033[H'
+}
+
+#-------------------------------------------------------------------------------
+# goto_position(row, col)
+#   Moves the cursor to the specified terminal row and column.
+#-------------------------------------------------------------------------------
+goto_position() {
+  printf '\033[%s;%sH' "$1" "$2"
+}
+
+#-------------------------------------------------------------------------------
+# get_terminal_size()
+#   Acquires the terminal's current row/column size using 'tput'. Sets internal
+#   variables for row, column, and dynamic column widths (Service, Status, PID,
+#   User, Command). We compute `content_rows` based on subtracting 5 lines for
+#   the header and borders.
+#-------------------------------------------------------------------------------
+get_terminal_size() {
+  rows=$(tput lines)
+  cols=$(tput cols)
+  content_rows=$((rows - 5))
+  service_width=$((cols * 20 / 100))
+  status_width=$((cols * 15 / 100))
+  pid_width=$((cols * 5 / 100))
+  user_width=$((cols * 10 / 100))
+  command_width=$((cols * 50 / 100))
+}
+
+###############################################################################
+# KEY READING
+# -----------------------------------------------------------------------------
+# This part of the script reads single keystrokes from the user to allow
+# navigation (without requiring Enter). It also handles arrow keys by capturing
+# escape sequences. POSIX shell does not have an integrated read for arrow keys,
+# so we rely on `stty` raw mode with `dd`.
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# read_key()
+#   Switches the terminal to raw mode and captures exactly one keystroke. If
+#   that keystroke is an escape character (indicating a possible arrow key),
+#   it reads additional bytes to form a complete escape sequence (e.g., ^[[A).
+#   Finally, it restores the original terminal settings.
+#-------------------------------------------------------------------------------
+read_key() {
+  old_stty=$(stty -g)
+  stty raw -echo
+  key1=$(dd bs=1 count=1 2>/dev/null)
+  if [ "$key1" = "$(printf '\033')" ]; then
+    key2=$(dd bs=1 count=1 2>/dev/null)
+    if [ "$key2" = "[" ]; then
+      key3=$(dd bs=1 count=1 2>/dev/null)
+      key1="$key1$key2$key3"
+    else
+      key1="$key1$key2"
+    fi
+  fi
+  stty "$old_stty"
+  printf '%s' "$key1"
+}
+
+###############################################################################
+# FORMATTING
+# -----------------------------------------------------------------------------
+# These helper functions print rows in normal or highlighted format.
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# format_row(service, status, pid, user, command)
+#   Prints a row in normal color format, using previously computed column widths.
+#   The script uses ANSI escape codes for color and resets them afterwards.
+#-------------------------------------------------------------------------------
+format_row() {
+  printf '\033[0m%-'"$service_width"'s\033[36m%-'"$status_width"'s\033[32m%-'"$pid_width"'s\033[35m%-'"$user_width"'s\033[33m%-'"$command_width"'s\033[0m\n' \
+    "$1" "$2" "$3" "$4" "$5"
+}
+
+#-------------------------------------------------------------------------------
+# highlight_row(service, status, pid, user, command)
+#   Prints a row in reverse video to show that it is currently selected.
+#   It uses the same spacing logic as format_row, but with a reversed background.
+#-------------------------------------------------------------------------------
+highlight_row() {
+  printf '\033[7m%-'"$service_width"'s%-'"$status_width"'s%-'"$pid_width"'s%-'"$user_width"'s%-'"$command_width"'s\033[0m\n' \
+    "$1" "$2" "$3" "$4" "$5"
+}
+
+###############################################################################
+# SERVICE PARSING & SORTING
+# -----------------------------------------------------------------------------
+# Gather all OpenRC services, fetch their status, detect any running PID/user
+# combo, and store them with a sorting order. Then the data is written to a
+# temporary file for easier rendering in the TUI.
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# get_services()
+#   Uses "rc-status --servicelist" to enumerate all OpenRC services, then
+#   inspects each line to extract:
+#     - service name
+#     - status (started, stopped, or otherwise)
+#     - pid (if any)
+#     - user (e.g., root, nobody, etc.)
+#     - command (the process line from `ps`)
+#   sort_order is assigned based on whether the service is running (1),
+#   started with no PID (2), or stopped (3). This data is then sorted and saved
+#   to $services_file for later display.
+#-------------------------------------------------------------------------------
+get_services() {
+  tmpfile="/tmp/rcstatus_raw.txt"
+  rc-status --servicelist >"$tmpfile"
+
+  # Clear the services file before populating it.
+  : >"$services_file"
+
+  while IFS= read -r line; do
+    service=$(echo "$line" | awk '{print $1}')
+    # Attempt to extract the status using sed, then use xargs to strip extra spaces.
+    status=$(echo "$line" | sed -n 's/^[^[]*\[\(.*\)\].*/\1/p' | xargs)
+
+    # Default "no PID" scenario.
+    pid="0"
+    user="-"
+    process="-"
+    # By default, assume "stopped" (sort_order=3).
+    sort_order="3"
+
+    # If the service is marked as "started", set the sort_order=2.
+    # Then see if a PID exists.
+    echo "$status" | grep -q "started"
+    is_started=$?
+    if [ "$is_started" -eq 0 ]; then
+      pid_found=$(pgrep -o -f "$service")
+      if [ -n "$pid_found" ]; then
+        pid="$pid_found"
+        sort_order="1"
+      else
+        sort_order="2"
+      fi
+    fi
+
+    # If there's a PID, fetch details from `ps`.
+    if [ "$pid" != "0" ]; then
+      # shellcheck disable=SC2009
+      ps_line=$(ps | grep -E "^[[:space:]]*$pid " || true)
+      if [ -n "$ps_line" ]; then
+        # 'set --' splits ps_line by whitespace fields:
+        #   The second field after the PID is typically the user, but the exact
+        #   fields can vary depending on the OS. Adjust accordingly if needed.
+        #   We need word splitting
+        set -- $ps_line
+        user="$2"
+        shift 3
+        # The rest is the command line.
+        process="$*"
+      fi
+    fi
+
+    # Print a single line with our pipe-delimited data.
+    printf '%s|%s|%s|%s|%s|%s\n' \
+      "$service" "$status" "$sort_order" "$pid" "$user" "$process" >>"$services_file"
+  done <"$tmpfile"
+
+  # Sort the results:
+  #   - Primary by sort_order (col 3), ascending
+  #   - Secondary by PID (col 4), ascending
+  sort -t '|' -k3,3n -k4,4n "$services_file" >"$services_file.tmp"
+  mv "$services_file.tmp" "$services_file"
+  rm -f "$tmpfile"
+}
+
+###############################################################################
+# TUI RENDERING
+# -----------------------------------------------------------------------------
+# The main interface is drawn here, including the header, controls, and
+# rendering of the service list with highlightable rows.
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# render_header()
+#   Clears the screen and prints the main header at the top, including the
+#   control instructions. Then prints the column headers (Service, Status, PID,
+#   User, Command) with color/formatting. Finally, prints a horizontal line.
+#-------------------------------------------------------------------------------
+render_header() {
+  clear_screen
+  header="╔══ OpenRC TUI ══╗"
+  controls="↑/k:Up │ ↓/j:Down │ l:Logs | s:Init Script | e:Edit │ q:Quit"
+
+  goto_position 1 1
+  printf '\033[K\033[1;34m%*s' "$(((cols - ${#header}) / 2))" ''
+  printf '%s' "$header"
+  printf '%*s\033[0m\n' "$(((cols - ${#header}) / 2))" ''
+
+  goto_position 1 $((cols - ${#controls}))
+  printf '\033[1;36m%s\033[0m\n' "$controls"
+
+  # Print column headers with white color.
+  printf '\033[K\033[1;37m%-*s%-*s%-*s%-*s%-*s\033[0m\n' \
+    "$service_width" "Service" \
+    "$status_width" "Status" \
+    "$pid_width" "PID" \
+    "$user_width" "User" \
+    "$command_width" "Command"
+
+  # Print a horizontal line across the screen with blue color.
+  printf '\033[K\033[1;34m'
+  i=1
+  while [ "$i" -le "$cols" ]; do
+    printf '═'
+    i=$((i + 1))
+  done
+  printf '\033[0m\n'
+}
+
+#-------------------------------------------------------------------------------
+# render_menu()
+#   Reads from the sorted services file and prints each row, starting from
+#   `scroll_position` and highlighting the row equal to `current_row`. Once
+#   the visible area (content_rows) is filled, it stops. If there are leftover
+#   lines, they will only be seen by scrolling.
+#-------------------------------------------------------------------------------
+render_menu() {
+  get_terminal_size
+  i=0
+  displayed=0
+
+  while IFS='|' read -r service status sort_order pid user process; do
+    # If we've not yet reached the scroll offset, skip lines accordingly.
+    if [ "$i" -lt "$scroll_position" ]; then
+      i=$((i + 1))
+      continue
+    fi
+
+    goto_position $((displayed + 4)) 1
+    printf '\033[K'
+
+    # Check if this line corresponds to the current highlighted row.
+    if [ "$i" -eq "$current_row" ]; then
+      highlight_row "$service" "$status" "$pid" "$user" "$process"
+    else
+      format_row "$service" "$status" "$pid" "$user" "$process"
+    fi
+
+    displayed=$((displayed + 1))
+    i=$((i + 1))
+
+    # If we've filled the available screen rows, stop rendering more lines.
+    if [ "$displayed" -ge "$content_rows" ]; then
+      break
+    fi
+  done <"$services_file"
+
+  # Clear remaining lines on screen if fewer services are listed than
+  # the visible area.
+  while [ "$displayed" -lt "$content_rows" ]; do
+    goto_position $((displayed + 4)) 1
+    printf '\033[K'
+    displayed=$((displayed + 1))
+  done
+}
+
+###############################################################################
+# LOG VIEWER
+# -----------------------------------------------------------------------------
+# Opens a sub-menu to display logs relevant to the currently selected service.
+# It searches in /var/log/messages, /var/log/<service>, and /var/log/<service>.log
+# if they exist, concatenating all found logs into a temporary file. Navigation
+# with arrow keys or k/j to scroll.
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# view_logs(service)
+#   Clears the screen and prints a dedicated header. Aggregates logs from
+#   likely log files. If none are found, displays a "No logs available" message.
+#   Then shows them in a scrollable sub-window.
+#-------------------------------------------------------------------------------
+view_logs() {
+  clear_screen
+  service="$1"
+  header="╔══ Logs: $service ══╗"
+  controls="↑/k:Up │ ↓/j:Down │ q:Back"
+
+  log_file="$(mktemp)"
+  scroll_log=0
+
+  # Fetch logs from /var/log/messages if it exists.
+  if [ -f /var/log/messages ]; then
+    grep -i "$service" /var/log/messages || echo "No logs found in /var/log/messages."
+  fi >"$log_file"
+
+  # If there's a folder /var/log/<service>, read all files there;
+  # or if there's /var/log/<service>.log, read it. Otherwise skip it.
+  if [ -d "/var/log/$service" ]; then
+    find "/var/log/$service" -type f -exec cat {} + || echo "No files in /var/log/$service."
+  elif [ -f "/var/log/$service.log" ]; then
+    cat "/var/log/$service.log" || echo "No logs in /var/log/$service.log."
+  fi >>"$log_file"
+
+  # If the file is empty, print a notice into the file.
+  if [ ! -s "$log_file" ]; then
+    echo "No logs available for $service." >"$log_file"
+  fi
+
+  total_lines_logs=$(wc -l <"$log_file")
+  content_rows_logs=$((rows - 5))
+  if [ "$total_lines_logs" -gt "$content_rows_logs" ]; then
+    # By default, scroll to the last "page" of logs, so that we see the most
+    # recent logs. This is arbitrary; you could start at 0 as well.
+    scroll_log=$((total_lines_logs - content_rows_logs))
+  fi
+
+  #-----------------------------------------------------------------------------
+  # render_logs()
+  #   Redraws the log viewer region with the current scroll offset.
+  #-----------------------------------------------------------------------------
+  render_logs() {
+    clear_screen
+    goto_position 1 1
+    printf '\033[1;34m%*s%s%*s\033[0m\n' \
+      $(((cols - ${#header}) / 2)) '' "$header" $(((cols - ${#header}) / 2)) ''
+
+    goto_position 1 $((cols - ${#controls}))
+    printf '\033[1;36m%s\033[0m\n' "$controls"
+
+    # Print a horizontal line.
+    printf '\033[1;34m'
+    i=1
+    while [ "$i" -le "$cols" ]; do
+      printf '═'
+      i=$((i + 1))
+    done
+    printf '\033[0m\n'
+
+    # Display the logs from scroll_log+1 to scroll_log+content_rows_logs lines.
+    line_num=0
+    sed -n "$((scroll_log + 1)),$((scroll_log + content_rows_logs))p" "$log_file" |
+      while IFS= read -r logline; do
+        goto_position $((line_num + 4)) 1
+        printf '%s\n' "$logline"
+        line_num=$((line_num + 1))
+      done
+  }
+
+  render_logs
+
+  # Main loop for reading user input while in the log viewer sub-menu.
+  while true; do
+    key=$(read_key)
+    case "$key" in
+    # Up arrow or k => scroll up if not already at the top.
+    $'\033[A' | k)
+      if [ "$scroll_log" -gt 0 ]; then
+        scroll_log=$((scroll_log - 1))
+        render_logs
+      fi
+      ;;
+    # Down arrow or j => scroll down if there are more lines remaining.
+    $'\033[B' | j)
+      if [ "$((scroll_log + content_rows_logs))" -lt "$total_lines_logs" ]; then
+        scroll_log=$((scroll_log + 1))
+        render_logs
+      fi
+      ;;
+    # q => go back to the main menu.
+    q) break ;;
+    esac
+  done
+
+  rm -f "$log_file"
+}
+
+###############################################################################
+# INIT SCRIPT VIEWER
+# -----------------------------------------------------------------------------
+# Displays the contents of /etc/init.d/<service> (if it exists) in a scrollable
+# viewer. Similar approach to view_logs.
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# view_initscript(service)
+#   Clears the screen, loads /etc/init.d/<service> into a temp file (if it exists),
+#   then allows the user to scroll with arrow keys or k/j.
+#-------------------------------------------------------------------------------
+view_initscript() {
+  clear_screen
+  service="$1"
+  header="╔══ Init Script: $service ══╗"
+  controls="↑/k:Up │ ↓/j:Down │ q:Back"
+
+  script_file=$(mktemp)
+  scroll_init=0
+
+  if [ -f "/etc/init.d/$service" ]; then
+    cat "/etc/init.d/$service" >"$script_file"
+  else
+    echo "No init script found for service: $service" >"$script_file"
+  fi
+
+  total_lines_init=$(wc -l <"$script_file")
+  content_rows_init=$((rows - 5))
+  if [ "$total_lines_init" -gt "$content_rows_init" ]; then
+    # Similarly, default to show the final portion of the script if it's large.
+    scroll_init=$((total_lines_init - content_rows_init))
+  fi
+
+  #-----------------------------------------------------------------------------
+  # render_initscript()
+  #   Prints the contents of the init script file from the current scroll offset.
+  #-----------------------------------------------------------------------------
+  render_initscript() {
+    clear_screen
+    goto_position 1 1
+    printf '\033[1;34m%*s%s%*s\033[0m\n' \
+      $(((cols - ${#header}) / 2)) '' "$header" $(((cols - ${#header}) / 2)) ''
+
+    goto_position 1 $((cols - ${#controls}))
+    printf '\033[1;36m%s\033[0m\n' "$controls"
+
+    # Print a horizontal line.
+    printf '\033[1;34m'
+    i=1
+    while [ "$i" -le "$cols" ]; do
+      printf '═'
+      i=$((i + 1))
+    done
+    printf '\033[0m\n'
+
+    line_num=0
+    sed -n "$((scroll_init + 1)),$((scroll_init + content_rows_init))p" "$script_file" |
+      while IFS= read -r scriptline; do
+        goto_position $((line_num + 4)) 1
+        printf '%s\n' "$scriptline"
+        line_num=$((line_num + 1))
+      done
+  }
+
+  render_initscript
+
+  # Main loop to handle scrolling inside the init script viewer.
+  while true; do
+    key=$(read_key)
+    case "$key" in
+    # Scroll up.
+    $'\033[A' | k)
+      if [ "$scroll_init" -gt 0 ]; then
+        scroll_init=$((scroll_init - 1))
+        render_initscript
+      fi
+      ;;
+    # Scroll down.
+    $'\033[B' | j)
+      if [ "$((scroll_init + content_rows_init))" -lt "$total_lines_init" ]; then
+        scroll_init=$((scroll_init + 1))
+        render_initscript
+      fi
+      ;;
+    # q => return to main screen.
+    q) break ;;
+    esac
+  done
+
+  rm -f "$script_file"
+}
+
+###############################################################################
+# MAIN
+# -----------------------------------------------------------------------------
+# This is the main loop of the program. It:
+#   1) Initializes the screen
+#   2) Loads/Sorts the services
+#   3) Renders the TUI (header + menu)
+#   4) Waits for user keystrokes to move selection or open sub-menus
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# handle_resize()
+#   A placeholder for handling screen resizing. Currently does nothing but can
+#   be extended in the future to recalculate columns or refresh the UI.
+#-------------------------------------------------------------------------------
+# shellcheck disable=SC2317
+handle_resize() {
+  :
+}
+
+# Trap window size change (WINCH) signals, if you want to add dynamic resizing.
+trap handle_resize WINCH
+
+clear_screen
+get_terminal_size
+get_services
+
+# Total number of lines (services) after sorting/parsing.
+total_rows=$(wc -l <"$services_file")
+
+# Show the cursor (some terminals may hide it by default, but we do so explicitly).
+printf '\033[?25h'
+
+# Print the initial header at the top of the screen.
+render_header
+
+# Main event loop: read user key input and respond.
+while true; do
+  render_menu
+  key=$(read_key)
+
+  case "$key" in
+  # UP/k: move cursor up, potentially adjust scroll if we hit the top.
+  $'\033[A' | k)
+    if [ "$current_row" -gt 0 ]; then
+      current_row=$((current_row - 1))
+      if [ "$current_row" -lt "$scroll_position" ]; then
+        scroll_position=$((scroll_position - 1))
+      fi
+    fi
+    ;;
+  # DOWN/j: move cursor down, potentially adjust scroll if we move beyond
+  # the visible area.
+  $'\033[B' | j)
+    if [ "$current_row" -lt "$((total_rows - 1))" ]; then
+      current_row=$((current_row + 1))
+      if [ "$current_row" -ge "$((scroll_position + content_rows))" ]; then
+        scroll_position=$((scroll_position + 1))
+      fi
+    fi
+    ;;
+  # Press 's' to view the init script of the selected service.
+  s)
+    selected_service=$(sed -n "$((current_row + 1))p" "$services_file" | cut -d'|' -f1)
+    view_initscript "$selected_service"
+    render_header
+    ;;
+  # Press 'l' to view logs.
+  l)
+    selected_service=$(sed -n "$((current_row + 1))p" "$services_file" | cut -d'|' -f1)
+    view_logs "$selected_service"
+    render_header
+    ;;
+  # Press 'e' to edit the init script in $EDITOR or vi.
+  e)
+    selected_service=$(sed -n "$((current_row + 1))p" "$services_file" | cut -d'|' -f1)
+    if [ -f "/etc/init.d/$selected_service" ]; then
+      ${EDITOR:-vi} "/etc/init.d/$selected_service"
+    else
+      printf "\nNo init script found for %s\n\nPress any key to continue..." "$selected_service"
+      # shellcheck disable=SC2034
+      dummy=$(read_key)
+    fi
+    render_header
+    ;;
+  # Press 'q' to quit the script
+  q) break ;;
+  esac
+done
+
+# When the user quits, clean up and exit.
+cleanup
