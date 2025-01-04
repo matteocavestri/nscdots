@@ -116,7 +116,7 @@ install_dotfiles() {
   cp "$dots_path"/dotfiles/.profile /home/"$username"/.profile
   cp "$dots_path"/dotfiles/.bashrc /home/"$username"/.bashrc
   cp -r "$dots_path"/dotfiles/.config /home/"$username"/.config
-  cp -r "$dots_path"/dotfiles/.local /home/"$username"/.local
+  cp -r "$dots_path"/dotfiles/.local/bin/* /home/"$username"/.local/bin/
 
   chmod +x /home/"$username"/.local/bin/*
 
