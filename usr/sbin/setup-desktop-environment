@@ -104,7 +104,7 @@ install_pipewire() {
   log "INFO" "Installing and configuring Pipewire..."
   apk add \
     pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber rtkit \
-    ffmpeg gstreamer gst-plugins-base gst-plugins-pipewire gst-vaapi
+    ffmpeg gstreamer gst-plugins-base gst-plugin-pipewire gst-vaapi
 
   adduser "$USERNAME" audio
   adduser "$USERNAME" video
