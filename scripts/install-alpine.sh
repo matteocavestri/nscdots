@@ -1,10 +1,9 @@
 #!/bin/sh
 
 apk add git
-mkdir -p /tmp/nscdots
-git clone https://github.com/matteocavestri/nscdots.git /tmp/nscdots
+git clone https://github.com/matteocavestri/nscdots.git
 
-./tmp/nscdots/usr/sbin/setup-hardware
-./tmp/nscdots/usr/sbin/setup-desktop-environment
-./tmp/nscdots/usr/bin/install-nscdots
-./tmp/nscdots/usr/bin/install-home
+./nscdots/usr/sbin/setup-hardware
+./nscdots/usr/sbin/setup-desktop-environment
+./nscdots/usr/bin/install-nscdots
+./nscdots/usr/bin/install-home
