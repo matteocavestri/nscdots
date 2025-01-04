@@ -48,7 +48,6 @@ install_software() {
     home)
       log "INFO" "Installing Home software..."
       flatpak install --user -y flathub org.libreoffice.LibreOffice
-      flatpak install --user -y flathub com.brave.Browser
       flatpak install --user -y flathub com.github.tchx84.Flatseal
       ;;
     audio-video)

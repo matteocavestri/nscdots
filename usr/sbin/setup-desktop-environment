@@ -133,7 +133,7 @@ install_compositors() {
   log "INFO" "Installing and configuring Wayland..."
   apk add \
     wayland wayland-protocols xwayland xorg-server wayland-pipewire-idle-inhibit \
-    libinput evdev \
+    libinput \
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
 
   adduser "$USERNAME" input
