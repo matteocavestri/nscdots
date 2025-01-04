@@ -194,9 +194,9 @@ install_greetd() {
 
   echo "dbus-run-session -- labwc" >>/etc/greetd/environments
   echo "dbus-run-session -- sway" >>/etc/greetd/environments
+  echo "tmux" >>/etc/greetd/environments
 
   rc-update add greetd
-  rc-service greetd start
 }
 
 secure_system() {

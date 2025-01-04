@@ -107,20 +107,15 @@ install_binaries() {
 install_dotfiles() {
   printf "Installing dotfiles in %s...\n" "$user_home"
 
-  # Ensure the base structure exists
-  mkdir -p "$user_home"
+  mkdir -p /home/matteocavestri/.config/labwc
+  mkdir -p /home/matteocavestri/.config/sway
+  mkdir -p /home/matteocavestri/.config/nvim/lua/config
+  mkdir -p /home/matteocavestri/.config/nvim/lua/plugins
+  mkdir -p /home/matteocavestri/.local/bin
 
-  # Copy all content from dotfiles to the user's home directory
-  cp -r "$dots_path/dotfiles/"* "$user_home/"
+  cp -r nscdots/dotfiles/.??* /home/"$username"/
 
-  # Ensure files in .local/bin are executable
-  local_bin="$user_home/.local/bin"
-  if [ -d "$local_bin" ]; then
-    find "$local_bin" -type f -exec chmod +x {} \;
-    printf "Set executable permissions for files in '%s'.\n" "$local_bin"
-  else
-    printf "Warning: Directory '.local/bin' not found or is empty.\n"
-  fi
+  chmod +x /home/"$username"/.local/bin/*
 
   # Change ownership of all files and directories in the home directory
   chown -R "$username:$username" "$user_home"
