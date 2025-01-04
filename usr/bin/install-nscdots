@@ -113,10 +113,10 @@ install_dotfiles() {
   mkdir -p /home/"$username"/.config/nvim/lua/plugins
   mkdir -p /home/"$username"/.local/bin
 
-  cp nscdots/dotfiles/.profile /home/"$username"/.profile
-  cp nscdots/dotfiles/.bashrc /home/"$username"/.bashrc
-  cp -r nscdots/dotfiles/.config /home/"$username"/.config
-  cp -r nscdots/dotfiles/.local /home/"$username"/.local
+  cp "$dots_path"/dotfiles/.profile /home/"$username"/.profile
+  cp "$dots_path"/dotfiles/.bashrc /home/"$username"/.bashrc
+  cp -r "$dots_path"/dotfiles/.config /home/"$username"/.config
+  cp -r "$dots_path"/dotfiles/.local /home/"$username"/.local
 
   chmod +x /home/"$username"/.local/bin/*
 
