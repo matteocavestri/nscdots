@@ -110,7 +110,7 @@ install_dotfiles() {
   mkdir -p /home/"$username"/.config
   mkdir -p /home/"$username"/.local/bin
 
-  rsync -av "$dots_path"/dotfiles /home/"$username"/
+  rsync -av "$dots_path"/dotfiles/ /home/"$username"/
   chmod +x /home/"$username"/.local/bin/*
 
   chown -R "$username:$username" "$user_home"
