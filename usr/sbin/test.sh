@@ -116,6 +116,9 @@ prompt_user_void() {
     echo "- $VENDOR"
   done
 
+  echo "Enter your choice: "
+  read -r PRIMARY_GPU
+
   # Ask for system locale
   echo "Enter your preferred locale (e.g., en_US.UTF-8):"
   read -r LANG_CHOICE
