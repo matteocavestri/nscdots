@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 # Function to configure essential services
 configure_services() {
