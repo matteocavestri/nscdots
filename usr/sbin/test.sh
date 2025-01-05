@@ -173,7 +173,7 @@ install_cpu_microcode_alpine() {
   log "INFO" "CPU microcode installed."
 }
 
-install_microcode_void() {
+install_cpu_microcode_void() {
   log "INFO" "Installing CPU microcode..."
   case $CPU_CHOICE in
   intel)
@@ -256,47 +256,50 @@ install_gpu_drivers_alpine() {
 
 install_gpu_drivers_void() {
   log "INFO" "Installing GPU drivers for $GPU_CHOICE..."
-  case $GPU_CHOICE in
-  amd)
-    xbps-install -Sy linux-firmware-amd mesa-dri vulkan-loader mesa-vulkan-radeon mesa-opencl mesa-vaapi mesa-vdpau
-    echo "RUSTICL_ENABLE=radeonsi" >>/etc/environment
-    echo "LIBVA_DRIVER_NAME=radeonsi" >>/etc/environment
-    echo "VDPAU_DRIVER=radeonsi" >>/etc/environment
-    ;;
-  intel)
-    xbps-install -Sy linux-firmware-intel mesa-dri mesa-vulkan-intel mesa-opencl mesa-vaapi mesa-vdpau libva-glx
-    if [ "$INTEL_GPU_TYPE" = "upto" ]; then
-      xbps-install -Sy libva-intel-driver
-      echo "LIBVA_DRIVER_NAME=i965" >>/etc/environment
-    else
-      xbps-install -Sy intel-media-driver
-      echo "LIBVA_DRIVER_NAME=iHD" >>/etc/environment
-    fi
-    echo "VDPAU_DRIVER=va_gl" >>/etc/environment
-    echo "RUSTICL_ENABLE=iris" >>/etc/environment
-    ;;
-  nvidia)
-    case $NVIDIA_SERIES in
-    800+)
-      xbps-install -Sy nvidia
+  for VENDOR in $GPU_CHOICE; do
+    case $VENDOR in
+    # case $GPU_CHOICE in
+    amd)
+      xbps-install -Sy linux-firmware-amd mesa-dri vulkan-loader mesa-vulkan-radeon mesa-opencl mesa-vaapi mesa-vdpau
+      echo "RUSTICL_ENABLE=radeonsi" >>/etc/environment
+      echo "LIBVA_DRIVER_NAME=radeonsi" >>/etc/environment
+      echo "VDPAU_DRIVER=radeonsi" >>/etc/environment
       ;;
-    600-700)
-      xbps-install -Sy nvidia470
+    intel)
+      xbps-install -Sy linux-firmware-intel mesa-dri mesa-vulkan-intel mesa-opencl mesa-vaapi mesa-vdpau libva-glx
+      if [ "$INTEL_GPU_TYPE" = "upto" ]; then
+        xbps-install -Sy libva-intel-driver
+        echo "LIBVA_DRIVER_NAME=i965" >>/etc/environment
+      else
+        xbps-install -Sy intel-media-driver
+        echo "LIBVA_DRIVER_NAME=iHD" >>/etc/environment
+      fi
+      echo "VDPAU_DRIVER=va_gl" >>/etc/environment
+      echo "RUSTICL_ENABLE=iris" >>/etc/environment
       ;;
-    400-500)
-      xbps-install -Sy nvidia390
+    nvidia)
+      case $NVIDIA_SERIES in
+      800+)
+        xbps-install -Sy nvidia
+        ;;
+      600-700)
+        xbps-install -Sy nvidia470
+        ;;
+      400-500)
+        xbps-install -Sy nvidia390
+        ;;
+      *)
+        log "ERROR" "Invalid NVIDIA series: $NVIDIA_SERIES"
+        exit 1
+        ;;
+      esac
       ;;
     *)
-      log "ERROR" "Invalid NVIDIA series: $NVIDIA_SERIES"
+      log "ERROR" "Invalid GPU vendor: $GPU_CHOICE"
       exit 1
       ;;
     esac
-    ;;
-  *)
-    log "ERROR" "Invalid GPU vendor: $GPU_CHOICE"
-    exit 1
-    ;;
-  esac
+  done
   log "INFO" "GPU drivers installed and environment variables configured."
 }
 
