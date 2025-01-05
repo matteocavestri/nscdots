@@ -112,5 +112,14 @@ System settings:
 - download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-install.sh`
 - run `sh zfs-install.sh`
 - reboot
-- setup void
+- you may need to enable dhcpd
+
+  ```shell
+  cp -R /etc/sv/dhcpcd-eth0 /etc/sv/dhcpcd-enp3s0
+  sed -i 's/eth0/enp3s0/' /etc/sv/dhcpcd-enp3s0/run
+  ln -s /etc/sv/dhcpcd-enp3s0 /var/service/
+  ```
+
 - run `zfs snapshot zroot/ROOT/void@initial-install`
+- clone the repo: `https://github.com/matteocavestri/nscdots.git`
+- run `./usr/sbin/setup-hardware`
