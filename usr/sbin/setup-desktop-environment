@@ -95,7 +95,7 @@ install_and_configure_dbus() {
   setup-devd udev
   apk add elogind polkit-elogind
   rc-update add elogind
-  rc-update add polkit
+  rc-update add polkit polkit-kde-agent-1
   rc-service elogind start
   rc-service polkit start
 }
@@ -104,7 +104,8 @@ install_pipewire() {
   log "INFO" "Installing and configuring Pipewire..."
   apk add \
     pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber rtkit \
-    ffmpeg gstreamer gst-plugins-base gst-plugin-pipewire gst-vaapi
+    ffmpeg gstreamer gst-plugins-base gst-plugin-pipewire gst-vaapi v4l-utils \
+    qt6-qtmultimedia qt6-qtmultimedia-ffmpeg qt6-qtmultimedia-gstreamer
 
   adduser "$USERNAME" audio
   adduser "$USERNAME" video
@@ -137,8 +138,7 @@ install_compositors() {
   log "INFO" "Installing and configuring Wayland..."
   apk add \
     wayland wayland-protocols xwayland wayland-pipewire-idle-inhibit \
-    wlr-protocols wlr-randr wlroots \
-    libinput \
+    wlr-protocols wlr-randr wlroots qt6-qtwayland qt5-qtwayland libinput \
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
 
   adduser "$USERNAME" input
@@ -149,12 +149,17 @@ install_desktop_environments() {
   apk add \
     swww swaylock swaylockd swayidle waybar wlsunset fuzzel \
     fuzzel alacritty network-manager-applet swaync \
-    polkit-gnome icu-data-full \
+    polkit-qt icu-data-full \
     grim slurp wl-clipboard libnotify \
     font-dejavu font-inconsolata-nerd font-noto-emoji font-terminus font-noto font-noto-cjk font-awesome font-noto-extra \
-    font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc \
-    thunar swayimg mpv \
-    flatpak xdg-user-dirs
+    font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc
+  # Kde related
+  apk add \
+    dolphin dolphin-plugins ark mpv chromium-qt5 pavucontrol-qt \
+    kwallet kwalletmanager kwallet-pam okular calligra \
+    qt6-qtwebengine breeze-icons breeze breeze-gtk breeze-cursors \
+    ffmpegthumbs kdialog kamoso kcalc \
+    xdg-user-dirs
 
   # Add brightnss support
   if [ "$BRIGHTNESS_SUPPORT" = "yes" ]; then
@@ -177,13 +182,12 @@ install_desktop_environments() {
 install_user_utilities() {
   log "INFO" "Installing user utilities for the desktop..."
   apk add \
-    gvfs udisks2 \
-    ntfs-3g \
-    gvfs-goa gvfs-smb gvfs-afc gvfs-nfs gvfs-dav gvfs-fuse gvfs-avahi
+    fuse udisks2 \
+    ntfs-3g kio kio-fuse kio-admin kio-extras kdenetwork-filesharing
 
   if [ "$PRINTER_SUPPORT" = "yes" ]; then
     log "INFO" "Installing and configuring printer support..."
-    apk add cups cups-filters
+    apk add cups cups-filters print-manager
     rc-service cupsd start
     rc-update add cupsd boot
   fi
@@ -191,10 +195,10 @@ install_user_utilities() {
 
 install_greetd() {
   log "INFO" "Installing and configuring greetd..."
-  apk add greetd greetd-regreet@testing cage
+  apk add greetd greetd-wlgreet@testing cage
 
   if [ -f /etc/greetd/config.toml ]; then
-    sed -i 's|command = ".*"|command = "cage -s -mextend -- regreet"|' /etc/greetd/config.toml
+    sed -i 's|command = ".*"|command = "cage -s -mextend -- wlgreet"|' /etc/greetd/config.toml
   fi
 
   echo "start-compositor labwc
@@ -277,7 +281,7 @@ main() {
   install_user_utilities
   install_greetd
   secure_system
-  install_flatpaks
+  # install_flatpaks
 
   clean_variables
   log "INFO" "Setup complete!"

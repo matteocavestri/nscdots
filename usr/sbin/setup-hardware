@@ -131,9 +131,10 @@ install_gpu_drivers() {
       fi
 
       apk add mkinitfs
-      if [ -f /etc/mkinitfs/mkinitfs.conf ]; then
-        sed -i 's/features: "/features: "kms /' /etc/mkinitfs/mkinitfs.conf
-      fi
+      # kms already added during zfs install
+      # if [ -f /etc/mkinitfs/mkinitfs.conf ]; then
+      #   sed -i 's/features: "/features: "kms /' /etc/mkinitfs/mkinitfs.conf
+      # fi
       mkinitfs
       ;;
     nvidia)
