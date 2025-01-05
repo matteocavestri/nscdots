@@ -151,11 +151,11 @@ install_desktop_environments() {
     fuzzel alacritty network-manager-applet swaync \
     polkit-qt icu-data-full \
     grim slurp wl-clipboard libnotify \
-    font-dejavu font-inconsolata-nerd font-noto-emoji font-terminus font-noto font-noto-cjk font-awesome font-noto-extra \
-    font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc
+    font-dejavu font-inconsolata-nerd font-noto-emoji font-terminus font-noto font-noto-cjk font-awesome font-noto-extra
+  # font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-jis-misc font-isas-misc
   # Kde related
   apk add \
-    dolphin dolphin-plugins ark mpv chromium-qt5 pavucontrol-qt \
+    dolphin dolphin-plugins ark mpv firefox pavucontrol-qt \
     kwallet kwalletmanager kwallet-pam okular calligra \
     qt6-qtwebengine breeze-icons breeze breeze-gtk breeze-cursors \
     ffmpegthumbs kdialog kamoso kcalc \

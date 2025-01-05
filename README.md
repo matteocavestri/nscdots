@@ -82,14 +82,16 @@ System settings:
 
 ## Install
 
-- start an alpine 3.21 extended install
+### Alpine
+
+- start an alpine 3.21 extended live
 - login as root
 - run `setup-interfaces -r`
-- download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/alpine-zfs-prepare.sh`
-- run `./alpine-zfs-prepare.sh`
+- download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-prepare.sh`
+- run `sh zfs-prepare.sh`
 - enter in chroot
-- download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/alpine-zfs-install.sh`
-- run `./scripts/alpine-zfs-install.sh`
+- download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-install.sh`
+- run `sh zfs-install.sh`
 - reboot
 - run `setup-interfaces -r`
 - run `setup-alpine` and ctrl+x when you have to format a disk (alpine is already installed)
@@ -98,3 +100,16 @@ System settings:
 - run `./usr/sbin/setup-hardware`
 - run `./usr/sbin/setup-desktop-environment`
 - run `./usr/bin/install-nscdots`
+
+### Void
+
+- start a void linux (zfs) live
+- login as root
+- `xbps-install -S wget`
+- download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-prepare.sh`
+- run `sh zfs-prepare.sh`
+- enter in chroot
+- `xbps-install -S wget`
+- download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-install.sh`
+- run `sh zfs-install.sh`
+- reboot
