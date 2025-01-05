@@ -109,7 +109,6 @@ System settings:
 - download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-prepare.sh`
 - run `sh zfs-prepare.sh`
 - enter in chroot
-- `xbps-install -S wget`
 - download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-install.sh`
 - run `sh zfs-install.sh`
 - reboot

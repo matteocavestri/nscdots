@@ -58,7 +58,7 @@ add_dracutmodules+=" zfs "
 omit_dracutmodules+=" btrfs "
 install_items+=" /etc/zfs/zroot.key "
 EOF
-  xbps-install -S zfs
+  xbps-install -Sy zfs
   zfs set org.zfsbootmenu:commandline="quiet" zroot/ROOT
   zfs set org.zfsbootmenu:keysource="zroot/ROOT/${ID}" zroot
 }
@@ -76,7 +76,6 @@ EOF
   mkdir -p /boot/efi/EFI/zbm
   mkdir -p /boot/efi/EFI/BOOT
   curl -o /boot/efi/EFI/zbm/vmlinuz.EFI -L https://get.zfsbootmenu.org/efi
-  cp /boot/efi/EFI/zbm/vmlinuz.EFI /boot/efi/EFI/zbm/vmlinuz-backup.EFI
   curl -o /boot/efi/EFI/BOOT/BOOTX64.EFI -LJ https://get.zfsbootmenu.org/efi/recovery
   apk add refind@testing
   refind-install
@@ -97,7 +96,7 @@ EOF
 
   mkdir -p /boot/efi
   mount /boot/efi
-  xbps-install -S zfsbootmenu gummiboot-efistub curl
+  xbps-install -Sy zfsbootmenu gummiboot-efistub curl
   mkdir -p /boot/efi/EFI/BOOT
 
   # Replace ZFSBootMenu configuration
@@ -117,10 +116,9 @@ Kernel:
 EOF
   generate-zbm
 
-  cp /boot/efi/EFI/zbm/vmlinuz.EFI /boot/efi/EFI/zbm/vmlinuz-backup.EFI
   curl -o /boot/efi/EFI/BOOT/BOOTX64.EFI -LJ https://get.zfsbootmenu.org/efi/recovery
 
-  xbps-install -S refind
+  xbps-install -Sy refind
   refind-install
   rm /boot/refind_linux.conf
 

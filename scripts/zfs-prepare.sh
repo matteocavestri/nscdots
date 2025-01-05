@@ -53,7 +53,6 @@ configure_zfs() {
     -O keylocation=file:///etc/zfs/zroot.key \
     -O keyformat=passphrase \
     -o autotrim=on \
-    -o compatibility=openzfs-2.1-linux \
     -m none zroot "$POOL_DEVICE"
 
   zfs create -o mountpoint=none zroot/ROOT
@@ -105,7 +104,7 @@ install_alpine_base() {
 install_void_base() {
   echo "INFO: Installing Void Linux base system..."
   XBPS_ARCH=x86_64 xbps-install \
-    -S -R https://mirrors.servercentral.com/voidlinux/current \
+    -Sy -R https://mirrors.servercentral.com/voidlinux/current \
     -r /mnt base-system wget
 
   cp /etc/hostid /mnt/etc
