@@ -1,5 +1,14 @@
 #!/bin/sh
 
+prompt_var() {
+  VAR_NAME="$1"
+  PROMPT_TEXT="$2"
+  DEFAULT_VALUE="$3"
+  echo "$PROMPT_TEXT [$DEFAULT_VALUE]:"
+  read -r INPUT
+  eval "$VAR_NAME=\"\${INPUT:-$DEFAULT_VALUE}\""
+}
+
 # Function to configure essential services
 configure_services() {
   echo "Configuring essential services..."
@@ -48,6 +57,9 @@ EOF
 # Main execution block
 echo "Starting in-chroot setup..."
 
+prompt_var BOOT_DISK "Enter the boot disk (e.g., /dev/nvme0n1)" "/dev/nvme0n1"
+BOOT_PART="1"
+BOOT_DEVICE="${BOOT_DISK}p${BOOT_PART}"
 # Set root password
 echo "Please set the root password:"
 passwd
