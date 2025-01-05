@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 # Function to prompt for user input and set variables
 prompt_var() {
