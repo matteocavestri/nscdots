@@ -404,6 +404,7 @@ main() {
     prompt_user_void
     install_cpu_microcode_void
     install_gpu_drivers_void
+    configure_void
     # se
   elif [ "$SYSTEM_TYPE" = "alpine" ]; then
     prompt_user_alpine
