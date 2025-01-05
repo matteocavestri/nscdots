@@ -127,11 +127,6 @@ prompt_user_void() {
   echo "Enter the username to create:"
   read -r USERNAME
 
-  echo "Enter the password for user $USERNAME:"
-  stty -echo # Disable echo
-  read -r USER_PASSWORD
-  stty echo # Re-enable echo
-  echo      # Move to a new line for clean output
   # Ask for hostname
   echo "Enter the hostname for this system:"
   read -r HOSTNAME
@@ -307,7 +302,7 @@ configure_void() {
   log "INFO" "Locale configured: $LANG_CHOICE"
   log "INFO" "Creating user $USERNAME..."
   useradd -m -G wheel "$USERNAME"
-  echo "$USERNAME:$USER_PASSWORD" | chpasswd
+  passwd "$USERNAME"
   chsh -s /bin/bash "$USERNAME"
   log "INFO" "User $USERNAME created and configured."
   log "INFO" "Setting system hostname..."
