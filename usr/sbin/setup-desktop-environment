@@ -138,7 +138,7 @@ install_compositors() {
   log "INFO" "Installing and configuring Wayland..."
   apk add \
     wayland wayland-protocols xwayland wayland-pipewire-idle-inhibit \
-    wlr-protocols wlr-randr wlroots qt6-qtwayland qt5-qtwayland libinput \
+    wlr-randr wlroots qt6-qtwayland qt5-qtwayland libinput \
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
 
   adduser "$USERNAME" input
@@ -169,7 +169,7 @@ install_desktop_environments() {
   # Update font cache
   fc-cache -fv
 
-  su "$USERNAME" -c "flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
+  # su "$USERNAME" -c "flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
   su "$USERNAME" -c "xdg-user-dirs-update"
 
   log "INFO" "Installing Labwc..."

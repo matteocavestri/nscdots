@@ -91,8 +91,9 @@ System settings:
 - download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/alpine-zfs-install.sh`
 - run `./scripts/alpine-zfs-install.sh`
 - reboot
-- clone the repo: `https://github.com/matteocavestri/nscdots.git`
+- run `setup-interfaces -r`
 - run `setup-alpine` and ctrl+x when you have to format a disk (alpine is already installed)
+- clone the repo: `https://github.com/matteocavestri/nscdots.git`
 - run `zfs snapshot zroot/ROOT/alpine@initial-install`
 - run `./usr/sbin/setup-hardware`
 - run `./usr/sbin/setup-desktop-environment`
