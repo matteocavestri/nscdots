@@ -260,22 +260,18 @@ install_gpu_drivers_void() {
     case $VENDOR in
     # case $GPU_CHOICE in
     amd)
-      xbps-install -Sy linux-firmware-amd mesa-dri vulkan-loader mesa-vulkan-radeon mesa-opencl mesa-vaapi mesa-vdpau
-      echo "RUSTICL_ENABLE=radeonsi" >>/etc/environment
-      echo "LIBVA_DRIVER_NAME=radeonsi" >>/etc/environment
-      echo "VDPAU_DRIVER=radeonsi" >>/etc/environment
+      xbps-install -Sy linux-firmware-amd \
+        mesa-dri vulkan-loader mesa-vulkan-radeon mesa-opencl mesa-vaapi mesa-vdpau
       ;;
     intel)
-      xbps-install -Sy linux-firmware-intel mesa-dri mesa-vulkan-intel mesa-opencl mesa-vaapi mesa-vdpau libva-glx
-      if [ "$INTEL_GPU_TYPE" = "upto" ]; then
+      xbps-install -Sy linux-firmware-intel \
+        mesa-dri mesa-vulkan-intel mesa-opencl mesa-vaapi mesa-vdpau libva-glx
+      if [ "$INTEL_GPU_TYPE" = "pre" ]; then
         xbps-install -Sy libva-intel-driver
-        echo "LIBVA_DRIVER_NAME=i965" >>/etc/environment
       else
         xbps-install -Sy intel-media-driver
-        echo "LIBVA_DRIVER_NAME=iHD" >>/etc/environment
       fi
-      echo "VDPAU_DRIVER=va_gl" >>/etc/environment
-      echo "RUSTICL_ENABLE=iris" >>/etc/environment
+
       ;;
     nvidia)
       case $NVIDIA_SERIES in
@@ -301,6 +297,8 @@ install_gpu_drivers_void() {
     esac
   done
   log "INFO" "GPU drivers installed and environment variables configured."
+
+  configure_primary_gpu_void
 }
 
 configure_void() {
@@ -332,6 +330,37 @@ configure_primary_gpu_alpine() {
     echo "LIBVA_DRIVER_NAME=nouveau" >>/etc/environment
     echo "VDPAU_DRIVER=nouveau" >>/etc/environment
     echo "RUSTICL_ENABLE=nouveau" >>/etc/environment
+    log "INFO" "Primary GPU set to: NVIDIA"
+    ;;
+  amd)
+    # echo "MESA_LOADER_DRIVER_OVERRIDE=radeonsi" >>/etc/environment
+    echo "LIBVA_DRIVER_NAME=radeonsi" >>/etc/environment
+    echo "VDPAU_DRIVER=radeonsi" >>/etc/environment
+    echo "RUSTICL_ENABLE=radeonsi" >>/etc/environment
+    log "INFO" "Primary GPU set to: AMD"
+    ;;
+  intel)
+    # echo "MESA_LOADER_DRIVER_OVERRIDE=i965" >>/etc/environment
+    if [ "$INTEL_CHOICE" = "post" ]; then
+      echo "LIBVA_DRIVER_NAME=iHD" >>/etc/environment
+    else
+      echo "LIBVA_DRIVER_NAME=i965" >>/etc/environment
+    fi
+    echo "VDPAU_DRIVER=va_gl" >>/etc/environment
+    echo "RUSTICL_ENABLE=iris" >>/etc/environment
+    log "INFO" "Primary GPU set to: Intel"
+    ;;
+  *)
+    log "ERROR" "Invalid choice for primary GPU: $PRIMARY_GPU"
+    return
+    ;;
+  esac
+}
+
+configure_primary_gpu_void() {
+  log "INFO" "Configuring primary GPU..."
+  case $PRIMARY_GPU in
+  nvidia)
     log "INFO" "Primary GPU set to: NVIDIA"
     ;;
   amd)
