@@ -28,6 +28,7 @@ EOF
 prepare_disks() {
   echo "Preparing disks..."
   modprobe zfs
+  zgenhostid -f 0x00bab10c
   zpool labelclear -f "$POOL_DISK"
   wipefs -a "$POOL_DISK"
   wipefs -a "$BOOT_DISK"
