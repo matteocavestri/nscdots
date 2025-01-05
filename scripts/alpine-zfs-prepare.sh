@@ -14,6 +14,9 @@ prompt_var() {
 # Function to configure Alpine repositories
 configure_repositories() {
   echo "Configuring Alpine repositories..."
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  export ID
   cat <<EOF >/etc/apk/repositories
 https://dl-cdn.alpinelinux.org/alpine/v3.21/main
 https://dl-cdn.alpinelinux.org/alpine/v3.21/community
