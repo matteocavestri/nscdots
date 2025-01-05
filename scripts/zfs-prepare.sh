@@ -106,7 +106,7 @@ install_void_base() {
   echo "INFO: Installing Void Linux base system..."
   XBPS_ARCH=x86_64 xbps-install \
     -S -R https://mirrors.servercentral.com/voidlinux/current \
-    -r /mnt base-system
+    -r /mnt base-system wget
 
   cp /etc/hostid /mnt/etc
   mkdir /mnt/etc/zfs

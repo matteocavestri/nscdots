@@ -98,6 +98,7 @@ EOF
   mkdir -p /boot/efi
   mount /boot/efi
   xbps-install -S zfsbootmenu gummiboot-efistub curl
+  mkdir -p /boot/efi/EFI/BOOT
 
   # Replace ZFSBootMenu configuration
   rm /etc/zfsbootmenu/config.yaml
@@ -115,6 +116,9 @@ Kernel:
   CommandLine: quiet loglevel=0
 EOF
   generate-zbm
+
+  cp /boot/efi/EFI/zbm/vmlinuz.EFI /boot/efi/EFI/zbm/vmlinuz-backup.EFI
+  curl -o /boot/efi/EFI/BOOT/BOOTX64.EFI -LJ https://get.zfsbootmenu.org/efi/recovery
 
   xbps-install -S refind
   refind-install

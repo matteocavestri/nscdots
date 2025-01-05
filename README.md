@@ -113,3 +113,5 @@ System settings:
 - download the script: `wget https://raw.githubusercontent.com/matteocavestri/nscdots/main/scripts/zfs-install.sh`
 - run `sh zfs-install.sh`
 - reboot
+- setup void
+- run `zfs snapshot zroot/ROOT/void@initial-install`
