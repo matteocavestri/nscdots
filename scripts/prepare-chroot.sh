@@ -203,7 +203,7 @@ configure_zfs() {
       -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
       -o autotrim=on \
-      -m none zroot "$POOL_DISKS"
+      -m none zroot $POOL_DISKS
     ;;
   mirror)
     zpool create -f -o ashift=12 \
@@ -215,7 +215,7 @@ configure_zfs() {
       -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
       -o autotrim=on \
-      -m none zroot mirror "$POOL_DISKS"
+      -m none zroot mirror $POOL_DISKS
     ;;
   raidz1)
     zpool create -f -o ashift=12 \
@@ -227,7 +227,7 @@ configure_zfs() {
       -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
       -o autotrim=on \
-      -m none zroot raidz1 "$POOL_DISKS"
+      -m none zroot raidz1 $POOL_DISKS
     ;;
   *)
     echo "ERROR: Unsupported RAID type: $RAID_TYPE"
