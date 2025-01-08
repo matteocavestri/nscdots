@@ -171,10 +171,11 @@ configure_zfs() {
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
     PARTITIONS=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}[0-9]+$")
+    echo "DEBUG: Found partitions for $DISK: $PARTITIONS" # Debug
     PARTITION_COUNT=$(echo "$PARTITIONS" | wc -l)
 
     if [ "$PARTITION_COUNT" -eq 2 ]; then
-      PARTITION=$(echo "$PARTITIONS" | grep -E "^${DISK}2$")
+      PARTITION=$(echo "$PARTITIONS" | grep -E "2$")
     elif [ "$PARTITION_COUNT" -eq 1 ]; then
       PARTITION=$(echo "$PARTITIONS" | head -n 1)
     else
