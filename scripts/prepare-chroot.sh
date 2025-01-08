@@ -128,8 +128,9 @@ configure_zfs() {
       -O acltype=posixacl \
       -O relatime=on \
       -O encryption=aes-256-gcm \
+      -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
-      -O keylocation=prompt \
+      -o autotrim=on \
       zroot "$POOL_DISKS"
     ;;
   mirror)
@@ -138,8 +139,9 @@ configure_zfs() {
       -O acltype=posixacl \
       -O relatime=on \
       -O encryption=aes-256-gcm \
+      -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
-      -O keylocation=prompt \
+      -o autotrim=on \
       zroot mirror "$POOL_DISKS"
     ;;
   raidz1)
@@ -148,8 +150,9 @@ configure_zfs() {
       -O acltype=posixacl \
       -O relatime=on \
       -O encryption=aes-256-gcm \
+      -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
-      -O keylocation=prompt \
+      -o autotrim=on \
       zroot raidz1 "$POOL_DISKS"
     ;;
   *)
