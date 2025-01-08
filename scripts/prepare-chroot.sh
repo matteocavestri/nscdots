@@ -93,6 +93,7 @@ clean_disks() {
     wipefs -a "/dev/$DISK"
     sgdisk --zap-all "/dev/$DISK"
   done
+  udevadm trigger
 }
 
 # Function to create partitions
@@ -126,6 +127,7 @@ configure_zfs() {
     zpool create -f -o ashift=12 \
       -O compression=lz4 \
       -O acltype=posixacl \
+      -O xattr=sa \
       -O relatime=on \
       -O encryption=aes-256-gcm \
       -O keylocation=file:///etc/zfs/zroot.key \
@@ -137,6 +139,7 @@ configure_zfs() {
     zpool create -f -o ashift=12 \
       -O compression=lz4 \
       -O acltype=posixacl \
+      -O xattr=sa \
       -O relatime=on \
       -O encryption=aes-256-gcm \
       -O keylocation=file:///etc/zfs/zroot.key \
@@ -148,6 +151,7 @@ configure_zfs() {
     zpool create -f -o ashift=12 \
       -O compression=lz4 \
       -O acltype=posixacl \
+      -O xattr=sa \
       -O relatime=on \
       -O encryption=aes-256-gcm \
       -O keylocation=file:///etc/zfs/zroot.key \
