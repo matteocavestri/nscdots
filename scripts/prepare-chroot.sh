@@ -170,12 +170,22 @@ configure_zfs() {
 
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
-    # Cerca la partizione ZFS (tipicamente la seconda partizione)
-    PARTITION=$(lsblk -n -o NAME,PARTTYPE -r /dev/"$DISK" | awk '$2 == "bf00" {print $1}')
+    PARTITIONS=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}[0-9]+$")
+    PARTITION_COUNT=$(echo "$PARTITIONS" | wc -l)
+
+    if [ "$PARTITION_COUNT" -eq 2 ]; then
+      PARTITION=$(echo "$PARTITIONS" | sed -n 2p)
+    elif [ "$PARTITION_COUNT" -eq 1 ]; then
+      PARTITION=$(echo "$PARTITIONS" | sed -n 1p)
+    else
+      echo "ERROR: No valid partitions found for $DISK"
+      exit 1
+    fi
+
     if [ -n "$PARTITION" ]; then
       POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
     else
-      echo "ERROR: No valid ZFS partition found for $DISK"
+      echo "ERROR: Could not determine a valid partition for $DISK"
       exit 1
     fi
   done
