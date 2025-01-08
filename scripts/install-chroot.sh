@@ -11,25 +11,50 @@
 # These files are edited by the script, you can find
 them in the appropriate directory in this repo
 
+# Collect user inputs at the beginning
+clear
+
+echo "INFO: Please set the root password:"
+passwd
+
+echo "Enter your timezone (e.g., Europe/Rome) [UTC]:"
+read -r TIMEZONE
+TIMEZONE="${TIMEZONE:-UTC}"
+
+echo "Enter your keymap (e.g., us) [us]:"
+read -r KEYMAP
+KEYMAP="${KEYMAP:-us}"
+
+echo "Enter your encoding (e.g., en_US.UTF-8) [en_US.UTF-8]:"
+read -r ENCODING
+ENCODING="${ENCODING:-en_US.UTF-8}"
+
+echo "INFO: Detecting partitions..."
+lsblk
+echo "Enter the boot partitions separated by space (e.g., /dev/sda1 /dev/sdb1):"
+read -r BOOT_PARTITIONS
+if [ -z "$BOOT_PARTITIONS" ]; then
+  echo "ERROR: No boot partitions provided. Exiting."
+  exit 1
+fi
+
+BOOT_PART_COUNT=$(echo "$BOOT_PARTITIONS" | wc -w)
+
+echo "Enter the username for the administrator account:"
+read -r ADMIN_USER
+if [ -z "$ADMIN_USER" ]; then
+  echo "ERROR: No username provided. Exiting."
+  exit 1
+fi
+
 # Function to configure essential settings for Void Linux
 configure_essential_settings_void() {
   echo "INFO: Configuring essential settings for Void Linux..."
-  echo "Enter your timezone (e.g., Europe/Rome) [UTC]:"
-  read -r TIMEZONE
-  TIMEZONE="${TIMEZONE:-UTC}"
   ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
-
-  echo "Enter your keymap (e.g., us) [us]:"
-  read -r KEYMAP
-  KEYMAP="${KEYMAP:-us}"
   cat <<EOF >>/etc/rc.conf
 KEYMAP="$KEYMAP"
 HARDWARECLOCK="UTC"
 EOF
-
-  echo "Enter your encoding (e.g., en_US.UTF-8) [en_US.UTF-8]:"
-  read -r ENCODING
-  ENCODING="${ENCODING:-en_US.UTF-8}"
   cat <<EOF >>/etc/default/libc-locales
 $ENCODING UTF-8
 EOF
@@ -53,18 +78,6 @@ EOF
 # Function to configure EFI bootloader for Void Linux
 configure_bootloader_void() {
   echo "INFO: Configuring EFI bootloader for Void Linux..."
-
-  echo "INFO: Detecting partitions..."
-  lsblk
-  echo "Enter the boot partitions separated by space (e.g., /dev/sda1 /dev/sdb1):"
-  read -r BOOT_PARTITIONS
-
-  if [ -z "$BOOT_PARTITIONS" ]; then
-    echo "ERROR: No boot partitions provided. Exiting."
-    exit 1
-  fi
-
-  BOOT_PART_COUNT=$(echo "$BOOT_PARTITIONS" | wc -w)
 
   if [ "$BOOT_PART_COUNT" -eq 1 ]; then
     BOOT_DEVICE="$BOOT_PARTITIONS"
@@ -124,24 +137,12 @@ EOF
 
 # Function to create an administrative user
 create_admin_user() {
-  echo "Enter the username for the administrator account:"
-  read -r ADMIN_USER
-  if [ -z "$ADMIN_USER" ]; then
-    echo "ERROR: No username provided. Exiting."
-    exit 1
-  fi
   useradd -m -G wheel "$ADMIN_USER"
   echo "Set password for $ADMIN_USER:"
   passwd "$ADMIN_USER"
 }
 
 # Main execution block
-clear
-
-# Set root password
-echo "INFO: Please set the root password:"
-passwd
-
 configure_essential_settings_void
 configure_initramfs_void
 configure_bootloader_void
