@@ -174,9 +174,9 @@ configure_zfs() {
     PARTITION_COUNT=$(echo "$PARTITIONS" | wc -l)
 
     if [ "$PARTITION_COUNT" -eq 2 ]; then
-      PARTITION=$(echo "$PARTITIONS" | sed -n 2p)
+      PARTITION=$(echo "$PARTITIONS" | grep -E "^${DISK}2$")
     elif [ "$PARTITION_COUNT" -eq 1 ]; then
-      PARTITION=$(echo "$PARTITIONS" | sed -n 1p)
+      PARTITION=$(echo "$PARTITIONS" | head -n 1)
     else
       echo "ERROR: No valid partitions found for $DISK"
       exit 1
