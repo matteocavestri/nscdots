@@ -183,8 +183,7 @@ configure_zfs() {
     fi
 
     if [ -n "$PARTITION" ]; then
-      # POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
-      POOL_DISKS="$POOL_DISKS $PARTITION"
+      POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
     else
       echo "ERROR: Could not determine a valid partition for $DISK"
       exit 1
@@ -204,7 +203,7 @@ configure_zfs() {
       -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
       -o autotrim=on \
-      zroot "$POOL_DISKS"
+      -m none zroot "$POOL_DISKS"
     ;;
   mirror)
     zpool create -f -o ashift=12 \
@@ -216,7 +215,7 @@ configure_zfs() {
       -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
       -o autotrim=on \
-      zroot mirror "$POOL_DISKS"
+      -m none zroot mirror "$POOL_DISKS"
     ;;
   raidz1)
     zpool create -f -o ashift=12 \
@@ -228,7 +227,7 @@ configure_zfs() {
       -O keylocation=file:///etc/zfs/zroot.key \
       -O keyformat=passphrase \
       -o autotrim=on \
-      zroot raidz1 "$POOL_DISKS"
+      -m none zroot raidz1 "$POOL_DISKS"
     ;;
   *)
     echo "ERROR: Unsupported RAID type: $RAID_TYPE"
