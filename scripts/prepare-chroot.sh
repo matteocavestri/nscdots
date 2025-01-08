@@ -50,18 +50,26 @@ suggest_raid_configuration() {
     SECOND_SIZE=$(lsblk -b -d -o NAME,SIZE | grep "$SECOND_DISK" | awk '{print $2}')
     if [ "$FIRST_SIZE" = "$SECOND_SIZE" ]; then
       echo "You can choose between Mirror (recommended) or Stripe."
-      RAID_TYPE="mirror"
+      echo "Select the RAID type (mirror/stripe/raidz1):"
+      read -r RAID_TYPE
+
     else
       echo "You can choose between Mirror or Stripe (Stripe recommended for non-production use)."
-      RAID_TYPE="stripe"
+      echo "Select the RAID type (mirror/stripe/raidz1):"
+      read -r RAID_TYPE
+
     fi
   elif [ "$DISK_COUNT" -eq 3 ]; then
     echo "INFO: You have selected three disks."
     echo "You can choose between RAIDZ1 (recommended) or Stripe."
-    RAID_TYPE="raidz1"
+    echo "Select the RAID type (mirror/stripe/raidz1):"
+    read -r RAID_TYPE
+
   else
     echo "INFO: Custom configuration required for $DISK_COUNT disks."
-    RAID_TYPE="custom"
+    echo "Select the RAID type (mirror/stripe/raidz1):"
+    read -r RAID_TYPE
+
   fi
 
   echo "Selected RAID type: $RAID_TYPE"
@@ -104,7 +112,13 @@ configure_zfs() {
 
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
-    POOL_DISKS="$POOL_DISKS /dev/${DISK}2"
+    # Usa lsblk per trovare le partizioni che terminano con "2"
+    PARTITION=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}.*2$")
+    if [ -n "$PARTITION" ]; then
+      POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
+    else
+      echo "WARNING: No partition ending with '2' found for $DISK"
+    fi
   done
 
   zpool create -f -o ashift=12 \
@@ -116,7 +130,7 @@ configure_zfs() {
     -O keylocation=file:///etc/zfs/zroot.key \
     -O keyformat=passphrase \
     -o autotrim=on \
-    -m none zroot $RAID_TYPE "$POOL_DISKS"
+    -m none zroot "$RAID_TYPE" "$POOL_DISKS"
 
   zfs create -o mountpoint=none zroot/ROOT
   zfs create -o mountpoint=/ -o canmount=noauto zroot/ROOT/${ID}
