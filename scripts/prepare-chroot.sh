@@ -183,7 +183,8 @@ configure_zfs() {
     fi
 
     if [ -n "$PARTITION" ]; then
-      POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
+      # POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
+      POOL_DISKS="POOL_DISKS $PARTITION"
     else
       echo "ERROR: Could not determine a valid partition for $DISK"
       exit 1
