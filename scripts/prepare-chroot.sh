@@ -170,8 +170,9 @@ configure_zfs() {
 
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
-    PARTITIONS=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}[0-9]+$")
+    PARTITIONS=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}([0-9]+|p[0-9]+)$")
     echo "DEBUG: Found partitions for $DISK: $PARTITIONS" # Debug
+
     PARTITION_COUNT=$(echo "$PARTITIONS" | wc -l)
 
     if [ "$PARTITION_COUNT" -eq 2 ]; then
