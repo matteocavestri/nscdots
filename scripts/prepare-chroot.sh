@@ -117,7 +117,7 @@ suggest_raid_configuration() {
     echo "INFO: Boot disk for stripe RAID: $BOOT_DISK"
   fi
 }
-#
+
 # Function to validate user input (e.g., check if a disk exists)
 validate_disks() {
   for DISK in $SELECTED_DISKS; do
@@ -238,6 +238,7 @@ configure_zfs() {
   zfs create -o mountpoint=none zroot/ROOT
   zfs create -o mountpoint=/ -o canmount=noauto zroot/ROOT/${ID}
   zfs create -o mountpoint=/root zroot/root
+  zfs create -o mountpoint=/home zroot/home
   zfs create -o mountpoint=/home/"${ADMIN_USERNAME}" zroot/home/"${ADMIN_USERNAME}"
   zpool set bootfs=zroot/ROOT/${ID} zroot
   zpool export zroot
@@ -250,6 +251,7 @@ import_zfs_and_mount() {
   zfs load-key -L prompt zroot
   zfs mount zroot/ROOT/${ID}
   zfs mount zroot/root
+  zfs mount zroot/home
   zfs mount zroot/home/"${ADMIN_USERNAME}"
   udevadm trigger
 }
