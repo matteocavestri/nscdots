@@ -170,15 +170,13 @@ configure_zfs() {
 
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
-    PARTITIONS=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}([0-9]+|p[0-9]+)$")
+    PARTITIONS=$(lsblk -n -o NAME -r /dev/"$DISK")
     echo "DEBUG: Found partitions for $DISK: $PARTITIONS" # Debug
 
-    PARTITION_COUNT=$(echo "$PARTITIONS" | wc -l)
-
-    if [ "$PARTITION_COUNT" -eq 2 ]; then
-      PARTITION=$(echo "$PARTITIONS" | grep -E "2$")
-    elif [ "$PARTITION_COUNT" -eq 1 ]; then
-      PARTITION=$(echo "$PARTITIONS" | head -n 1)
+    if echo "$PARTITIONS" | grep -q -E "^${DISK}(p?2)$"; then
+      PARTITION=$(echo "$PARTITIONS" | grep -E "^${DISK}(p?2)$")
+    elif echo "$PARTITIONS" | grep -q -E "^${DISK}(p?1)$"; then
+      PARTITION=$(echo "$PARTITIONS" | grep -E "^${DISK}(p?1)$")
     else
       echo "ERROR: No valid partitions found for $DISK"
       exit 1
@@ -191,6 +189,8 @@ configure_zfs() {
       exit 1
     fi
   done
+
+  echo "DEBUG: Final pool disks: $POOL_DISKS"
 
   case $RAID_TYPE in
   stripe)
