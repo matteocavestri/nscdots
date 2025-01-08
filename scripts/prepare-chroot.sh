@@ -42,7 +42,14 @@ list_and_select_disks() {
 suggest_raid_configuration() {
   DISK_COUNT=$(echo "$SELECTED_DISKS" | wc -w)
 
-  if [ "$DISK_COUNT" -eq 2 ]; then
+  if [ "$DISK_COUNT" -eq 1 ]; then
+    echo "INFO: You have selected only one disk."
+    echo "RAID type automatically set to 'stripe' as only one disk is available."
+    RAID_TYPE="stripe"
+    BOOT_DISK="$SELECTED_DISKS"
+    echo "INFO: Automatically using $BOOT_DISK as the boot disk."
+
+  elif [ "$DISK_COUNT" -eq 2 ]; then
     echo "INFO: You have selected two disks."
     FIRST_DISK=$(echo "$SELECTED_DISKS" | awk '{print $1}')
     SECOND_DISK=$(echo "$SELECTED_DISKS" | awk '{print $2}')
@@ -50,31 +57,67 @@ suggest_raid_configuration() {
     SECOND_SIZE=$(lsblk -b -d -o NAME,SIZE | grep "$SECOND_DISK" | awk '{print $2}')
     if [ "$FIRST_SIZE" = "$SECOND_SIZE" ]; then
       echo "You can choose between Mirror (recommended) or Stripe."
-      echo "Select the RAID type (mirror/stripe/raidz1):"
-      read -r RAID_TYPE
-
     else
       echo "You can choose between Mirror or Stripe (Stripe recommended for non-production use)."
-      echo "Select the RAID type (mirror/stripe/raidz1):"
-      read -r RAID_TYPE
-
     fi
+    echo "Select the RAID type (mirror/stripe/raidz1):"
+    read -r RAID_TYPE
+
+    if [ "$RAID_TYPE" = "stripe" ]; then
+      echo "INFO: You have selected the RAID type 'stripe'."
+      echo "You need to select a boot disk. The selected disk will include the EFI partition."
+      echo "Available disks: $SELECTED_DISKS"
+      echo "Enter the disk to use as boot disk (e.g., sda):"
+      read -r BOOT_DISK
+      if ! echo "$SELECTED_DISKS" | grep -qw "$BOOT_DISK"; then
+        echo "ERROR: Selected boot disk ($BOOT_DISK) is not among the selected disks. Exiting."
+        exit 1
+      fi
+      echo "INFO: Selected boot disk: $BOOT_DISK"
+    fi
+
   elif [ "$DISK_COUNT" -eq 3 ]; then
     echo "INFO: You have selected three disks."
     echo "You can choose between RAIDZ1 (recommended) or Stripe."
     echo "Select the RAID type (mirror/stripe/raidz1):"
     read -r RAID_TYPE
 
+    if [ "$RAID_TYPE" = "stripe" ]; then
+      echo "INFO: You need to select a boot disk. The selected disk will include the EFI partition."
+      echo "Available disks: $SELECTED_DISKS"
+      echo "Enter the disk to use as boot disk (e.g., sda):"
+      read -r BOOT_DISK
+      if ! echo "$SELECTED_DISKS" | grep -qw "$BOOT_DISK"; then
+        echo "ERROR: Selected boot disk ($BOOT_DISK) is not among the selected disks. Exiting."
+        exit 1
+      fi
+      echo "INFO: Selected boot disk: $BOOT_DISK"
+    fi
+
   else
     echo "INFO: Custom configuration required for $DISK_COUNT disks."
     echo "Select the RAID type (mirror/stripe/raidz1):"
     read -r RAID_TYPE
 
+    if [ "$RAID_TYPE" = "stripe" ]; then
+      echo "INFO: You need to select a boot disk. The selected disk will include the EFI partition."
+      echo "Available disks: $SELECTED_DISKS"
+      echo "Enter the disk to use as boot disk (e.g., sda):"
+      read -r BOOT_DISK
+      if ! echo "$SELECTED_DISKS" | grep -qw "$BOOT_DISK"; then
+        echo "ERROR: Selected boot disk ($BOOT_DISK) is not among the selected disks. Exiting."
+        exit 1
+      fi
+      echo "INFO: Selected boot disk: $BOOT_DISK"
+    fi
   fi
 
   echo "Selected RAID type: $RAID_TYPE"
+  if [ "$RAID_TYPE" = "stripe" ] && [ -n "$BOOT_DISK" ]; then
+    echo "INFO: Boot disk for stripe RAID: $BOOT_DISK"
+  fi
 }
-
+#
 # Function to validate user input (e.g., check if a disk exists)
 validate_disks() {
   for DISK in $SELECTED_DISKS; do
@@ -88,6 +131,7 @@ validate_disks() {
 # Function to clean disks
 clean_disks() {
   echo "INFO: Cleaning disks..."
+  zgenhostid -f 0x00bab10c
   for DISK in $SELECTED_DISKS; do
     zpool labelclear -f "/dev/$DISK"
     wipefs -a "/dev/$DISK"
@@ -97,11 +141,24 @@ clean_disks() {
 }
 
 # Function to create partitions
+
 create_partitions() {
   echo "INFO: Creating partitions..."
   for DISK in $SELECTED_DISKS; do
-    sgdisk -n "1:1m:+512m" -t "1:ef00" "/dev/$DISK" # Boot partition
-    sgdisk -n "2:0:-10m" -t "2:bf00" "/dev/$DISK"   # ZFS pool partition
+    if [ "$RAID_TYPE" = "stripe" ]; then
+      if [ "$DISK" = "$BOOT_DISK" ]; then
+        echo "INFO: Creating EFI and ZFS partitions on boot disk $DISK (stripe)..."
+        sgdisk -n "1:1m:+512m" -t "1:ef00" "/dev/$DISK" # EFI partition
+        sgdisk -n "2:0:-10m" -t "2:bf00" "/dev/$DISK"   # ZFS pool partition
+      else
+        echo "INFO: Creating a single ZFS partition on disk $DISK (stripe)..."
+        sgdisk -n "1:1m:-10m" -t "1:bf00" "/dev/$DISK" # ZFS pool partition
+      fi
+    else
+      echo "INFO: Creating EFI and ZFS partitions on disk $DISK (non-stripe)..."
+      sgdisk -n "1:1m:+512m" -t "1:ef00" "/dev/$DISK" # EFI partition
+      sgdisk -n "2:0:-10m" -t "2:bf00" "/dev/$DISK"   # ZFS pool partition
+    fi
   done
 }
 
@@ -113,11 +170,12 @@ configure_zfs() {
 
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
-    PARTITION=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}.*2$")
+    # Cerca la partizione ZFS (tipicamente la seconda partizione)
+    PARTITION=$(lsblk -n -o NAME,PARTTYPE -r /dev/"$DISK" | awk '$2 == "bf00" {print $1}')
     if [ -n "$PARTITION" ]; then
       POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
     else
-      echo "ERROR: No partition ending with '2' found for $DISK"
+      echo "ERROR: No valid ZFS partition found for $DISK"
       exit 1
     fi
   done
