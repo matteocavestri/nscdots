@@ -112,25 +112,51 @@ configure_zfs() {
 
   POOL_DISKS=""
   for DISK in $SELECTED_DISKS; do
-    # Usa lsblk per trovare le partizioni che terminano con "2"
     PARTITION=$(lsblk -n -o NAME -r /dev/"$DISK" | grep -E "^${DISK}.*2$")
     if [ -n "$PARTITION" ]; then
       POOL_DISKS="$POOL_DISKS /dev/$PARTITION"
     else
-      echo "WARNING: No partition ending with '2' found for $DISK"
+      echo "ERROR: No partition ending with '2' found for $DISK"
+      exit 1
     fi
   done
 
-  zpool create -f -o ashift=12 \
-    -O compression=lz4 \
-    -O acltype=posixacl \
-    -O xattr=sa \
-    -O relatime=on \
-    -O encryption=aes-256-gcm \
-    -O keylocation=file:///etc/zfs/zroot.key \
-    -O keyformat=passphrase \
-    -o autotrim=on \
-    -m none zroot "$RAID_TYPE" "$POOL_DISKS"
+  case $RAID_TYPE in
+  stripe)
+    zpool create -f -o ashift=12 \
+      -O compression=lz4 \
+      -O acltype=posixacl \
+      -O relatime=on \
+      -O encryption=aes-256-gcm \
+      -O keyformat=passphrase \
+      -O keylocation=prompt \
+      zroot "$POOL_DISKS"
+    ;;
+  mirror)
+    zpool create -f -o ashift=12 \
+      -O compression=lz4 \
+      -O acltype=posixacl \
+      -O relatime=on \
+      -O encryption=aes-256-gcm \
+      -O keyformat=passphrase \
+      -O keylocation=prompt \
+      zroot mirror "$POOL_DISKS"
+    ;;
+  raidz1)
+    zpool create -f -o ashift=12 \
+      -O compression=lz4 \
+      -O acltype=posixacl \
+      -O relatime=on \
+      -O encryption=aes-256-gcm \
+      -O keyformat=passphrase \
+      -O keylocation=prompt \
+      zroot raidz1 "$POOL_DISKS"
+    ;;
+  *)
+    echo "ERROR: Unsupported RAID type: $RAID_TYPE"
+    exit 1
+    ;;
+  esac
 
   zfs create -o mountpoint=none zroot/ROOT
   zfs create -o mountpoint=/ -o canmount=noauto zroot/ROOT/${ID}
