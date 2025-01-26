@@ -1,0 +1,208 @@
+#!/bin/sh
+#===============================================================================
+# neve-services-setup (version 0.0.1)
+#-------------------------------------------------------------------------------
+# Author: Matteo Cavestri
+# Organization: FMPT Org
+# Project: Neve Project
+# License: GNU GPL v2 or later
+#
+# Description:
+#   This script manages services using runit. It supports:
+#     - Interactive mode: lists available and enabled services, prompts to
+#       enable available services one by one.
+#     - Default mode (--default): applies a predefined set of services after
+#       user confirmation.
+#     - GUI mode (--gui-desktop): enables GUI-related services.
+#     - Virtualisation mode (--virtualisation): enables virtualisation services.
+#     - Help mode (--help): displays usage instructions.
+#     - Automatic yes mode (--yes): skips confirmation prompts in applicable modes.
+#
+# Dependencies:
+#   - ln: to enable services by creating symbolic links.
+#   - ls, grep, printf: for handling service lists and formatting output.
+#===============================================================================
+
+# Paths for runit service directories
+SERVICES_DIR="/etc/sv"
+ENABLED_SERVICES_DIR="/var/service"
+DEFAULT_SERVICES="cronie earlyoom ntpd-rs socklog-unix nanoklogd sshd irqbalance NetworkManager runsvdir-$(getent group wheel | cut -d: -f4 | cut -d, -f1) udevd"
+DESKTOP_SERVICES="cupsd greetd dbus"
+VIRTUALISATION_SERVICES="libvirtd virtlockd virtlogd"
+TMP_AVAILABLE="/tmp/neve_services_available.txt"
+TMP_ENABLED="/tmp/neve_services_enabled.txt"
+
+# Cleanup function to remove temporary files and exit
+cleanup() {
+  rm -f "$TMP_AVAILABLE" "$TMP_ENABLED"
+  exit
+}
+trap 'cleanup' INT TERM EXIT
+
+# Display the help page
+show_help() {
+  printf "Usage: neve-services-setup [OPTION]\n"
+  printf "\nOptions:\n"
+  printf "  -h, --help             Show this help message and exit\n"
+  printf "  -d, --default          Apply the default service setup\n"
+  printf "  -g, --gui-desktop      Enable GUI desktop-related services\n"
+  printf "  -v, --virtualisation   Enable virtualisation-related services\n"
+  printf "  -y, --yes              Skip prompts (works with --default, --gui-desktop, --virtualisation)\n"
+}
+
+# List all available services
+list_services() {
+  ls "$SERVICES_DIR" >"$TMP_AVAILABLE" 2>/dev/null
+}
+
+# List all enabled services
+list_enabled_services() {
+  ls "$ENABLED_SERVICES_DIR" >"$TMP_ENABLED" 2>/dev/null
+}
+
+# Filter available services to exclude enabled ones
+filter_available_services() {
+  grep -Fxv -f "$TMP_ENABLED" "$TMP_AVAILABLE" >"$TMP_AVAILABLE.tmp"
+  mv "$TMP_AVAILABLE.tmp" "$TMP_AVAILABLE"
+}
+
+# Format and display services in aligned columns
+display_columns() {
+  awk 'BEGIN {
+    cols = 3;  # Number of columns
+    max_width = 30;  # Maximum width per column
+  }
+  {
+    row[NR % cols == 0 ? cols : NR % cols] = sprintf("%-*s", max_width, $0);
+    if (NR % cols == 0) {
+      printf "| %-*s | %-*s | %-*s |\n", max_width, row[1], max_width, row[2], max_width, row[3];
+      delete row;
+    }
+  }
+  END {
+    if (length(row) > 0) {
+      for (i = length(row) + 1; i <= cols; i++) {
+        row[i] = sprintf("%-*s", max_width, "");
+      }
+      printf "| %-*s | %-*s | %-*s |\n", max_width, row[1], max_width, row[2], max_width, row[3];
+    }
+  }' "$1"
+}
+
+# Display services grouped by status
+display_services() {
+  printf "\n\033[1mAvailable Services:\033[0m\n"
+  display_columns "$TMP_AVAILABLE"
+  printf "\n\033[1mEnabled Services:\033[0m\n"
+  display_columns "$TMP_ENABLED"
+  printf "\n"
+}
+
+# Apply a service setup
+setup_services() {
+  services="$1"
+  mode="$2"
+
+  printf "\n\033[1mCurrently Enabled Services:\033[0m\n"
+  display_columns "$TMP_ENABLED"
+  printf "\n\033[1mServices to Enable:\033[0m\n"
+  printf "  - %s\n" "$services"
+
+  if [ "$AUTO_YES" = true ]; then
+    CONFIRM="y"
+  else
+    printf "\nDo you want to enable the %s services? (y/n): " "$mode"
+    read -r CONFIRM
+  fi
+
+  if [ "$CONFIRM" = "y" ] || [ "$CONFIRM" = "Y" ]; then
+    for service in $services; do
+      if [ -e "$ENABLED_SERVICES_DIR/$service" ]; then
+        printf "Skipped (already enabled): %s\n" "$service"
+      else
+        ln -s "$SERVICES_DIR/$service" "$ENABLED_SERVICES_DIR/$service" 2>/dev/null &&
+          printf "Enabled: %s\n" "$service"
+      fi
+    done
+  else
+    printf "%s setup aborted.\n" "$mode"
+  fi
+}
+
+# Interactive mode for enabling services
+interactive_mode() {
+  printf "\n\033[1mInteractive Setup:\033[0m\n"
+  while IFS= read -r service; do
+    printf "Do you want to enable service '%s'? (y/n): " "$service"
+    read -r choice </dev/tty
+    case "$choice" in
+    [yY]*)
+      if [ -e "$ENABLED_SERVICES_DIR/$service" ]; then
+        printf "Skipped (already enabled): %s\n" "$service"
+      else
+        ln -s "$SERVICES_DIR/$service" "$ENABLED_SERVICES_DIR/$service" 2>/dev/null &&
+          printf "Enabled: %s\n" "$service"
+      fi
+      ;;
+    *) printf "Skipping: %s\n" "$service" ;;
+    esac
+  done <"$TMP_AVAILABLE"
+}
+
+# Main script logic
+AUTO_YES=false
+APPLY_DEFAULT=false
+APPLY_GUI=false
+APPLY_VIRTUALISATION=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+  -h | --help)
+    show_help
+    exit
+    ;;
+  -d | --default)
+    APPLY_DEFAULT=true
+    ;;
+  -g | --gui-desktop)
+    APPLY_GUI=true
+    ;;
+  -v | --virtualisation)
+    APPLY_VIRTUALISATION=true
+    ;;
+  -y | --yes)
+    AUTO_YES=true
+    ;;
+  *)
+    printf "Unknown option: %s\n" "$1" >&2
+    show_help
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+list_services
+list_enabled_services
+
+if $APPLY_DEFAULT; then
+  setup_services "$DEFAULT_SERVICES" "default"
+fi
+
+if $APPLY_GUI; then
+  setup_services "$DESKTOP_SERVICES" "GUI desktop"
+fi
+
+if $APPLY_VIRTUALISATION; then
+  setup_services "$VIRTUALISATION_SERVICES" "virtualisation"
+fi
+
+if ! $APPLY_DEFAULT && ! $APPLY_GUI && ! $APPLY_VIRTUALISATION; then
+  filter_available_services
+  display_services
+  interactive_mode
+fi
+
+cleanup
+
+
