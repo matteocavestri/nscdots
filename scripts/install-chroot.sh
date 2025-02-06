@@ -195,7 +195,7 @@ service_config() {
   xbps-install -Sy NetworkManager python3-dbus
 
   # Setup xdg desktop portal
-  xbps-install -Sy xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-wlr xdg-desktop-portal-kde
+  xbps-install -Sy xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-kde
 
   # Setup pipewire, gstreamer and v4l
   xbps-install -Sy \
@@ -244,7 +244,6 @@ EOF
 ## DESKTOP CONFIG
 ##################################
 desktop_setup() {
-  # Install wayland and compositors
   # Install utilities
   xbps-install -Sy \
     clang go rust nodejs python3 lua bash bash-completion \
@@ -254,24 +253,45 @@ desktop_setup() {
     lazygit ripgrep fd fzf curl wget starship \
     p7zip unzip xz tar rsync
 
-  # Wayland
+  # # Wayland
+  # xbps-install -Sy \
+  #   sway labwc \
+  #   swww sway-audio-idle-inhibit swayidle swaylock Waybar \
+  #   polkit-kde-agent wl-clipboard cliphist libnotify libinput \
+  #   wlsunset fuzzel alacritty network-manager-applet \
+  #   grim slurp noto-fonts-ttf noto-fonts-cjk noto-fonts-emoji nerd-fonts \
+  #   qt5-wayland qt6-wayland ffmpeg
+  # fc-cache -fv
+  #
+  # # Desktop tools
+  # xbps-install -Sy \
+  #   qt5ct qt6ct \
+  #   dolphin dolphin-plugins ark mpv pavucontrol-qt qpwgraph \
+  #   kwallet kwallet-pam kwalletmanager \
+  #   okular libreoffice ffmpegthumbs xdg-user-dirs kcalc \
+  #   firefox breeze breeze-cursors breeze-icons breeze-gtk \
+  #   fuse ntfs-3g smbnetfs nfs-utils virt-manager
+
+  # Setup graphics servers
   xbps-install -Sy \
-    sway labwc \
-    swww sway-audio-idle-inhibit swayidle swaylock Waybar \
-    polkit-kde-agent wl-clipboard cliphist libnotify libinput \
-    wlsunset fuzzel alacritty network-manager-applet \
-    grim slurp noto-fonts-ttf noto-fonts-cjk noto-fonts-emoji nerd-fonts \
-    qt5-wayland qt6-wayland ffmpeg
+    mlocate ca-certificates xtools \
+    xorg-minimal wl-clipboard libinput libnotify cliphist \
+    wayland wayland-protocols wayland-utils xorg-server-xwayland \
+    xorg-fonts noto-fonts-ttf noto-fonts-cjk noto-fonts-emoji nerd-fonts \
+    qt5-wayland qt6-wayland
   fc-cache -fv
 
-  # Desktop tools
+  # Install Desktop Environment and tools
   xbps-install -Sy \
-    qt5ct qt6ct \
-    dolphin dolphin-plugins ark mpv pavucontrol-qt qpwgraph \
-    kwallet kwallet-pam kwalletmanager \
-    okular libreoffice ffmpegthumbs xdg-user-dirs kcalc \
-    firefox breeze breeze-cursors breeze-icons breeze-gtk \
-    fuse ntfs-3g smbnetfs nfs-utils virt-manager
+    kde-plasma kde-baseapps \
+    ffmpeg breeze breeze-cursors breeze-icons breeze-gtk \
+    kdegraphics-thumbnailers ffmpegthumbs ffmpeg \
+    qpwgraph libreoffice firefox virt-manager \
+    dolphin-plugins xdg-user-dirs okular ark \
+    fuse ntfs-3g smbnetfs nfs-utils
+
+  # Setup session start
+  echo "exec startplasma-x11" >.xinitrc
 
   # Setup wine
   xbps-install -Sy \
@@ -279,14 +299,14 @@ desktop_setup() {
 
   su "$USERNAME" -c "xdg-user-dirs-update"
 
-  xbps-install -Sy \
-    greetd gtkgreet cage
-  if [ -f /etc/greetd/config.toml ]; then
-    sed -i 's|command = ".*"|command = "cage -s -mextend -- gtkgreet"|' /etc/greetd/config.toml
-  fi
-  echo "dbus-run-session -- labwc
-    dbus-run-session -- sway" >>/etc/greetd/environments
-  ln -s /etc/sv/greetd /var/service
+  # xbps-install -Sy \
+  #   greetd gtkgreet cage
+  # if [ -f /etc/greetd/config.toml ]; then
+  #   sed -i 's|command = ".*"|command = "cage -s -mextend -- gtkgreet"|' /etc/greetd/config.toml
+  # fi
+  # echo "dbus-run-session -- labwc
+  #   dbus-run-session -- sway" >>/etc/greetd/environments
+  # ln -s /etc/sv/greetd /var/service
 }
 
 ##################################

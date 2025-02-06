@@ -27,7 +27,7 @@
 SERVICES_DIR="/etc/sv"
 ENABLED_SERVICES_DIR="/var/service"
 DEFAULT_SERVICES="cronie earlyoom ntpd-rs socklog-unix nanoklogd sshd irqbalance NetworkManager runsvdir-$(getent group wheel | cut -d: -f4 | cut -d, -f1) udevd"
-DESKTOP_SERVICES="cupsd greetd dbus"
+DESKTOP_SERVICES="cupsd sddm dbus"
 VIRTUALISATION_SERVICES="libvirtd virtlockd virtlogd"
 TMP_AVAILABLE="/tmp/neve_services_available.txt"
 TMP_ENABLED="/tmp/neve_services_enabled.txt"
@@ -204,5 +204,3 @@ if ! $APPLY_DEFAULT && ! $APPLY_GUI && ! $APPLY_VIRTUALISATION; then
 fi
 
 cleanup
-
-
